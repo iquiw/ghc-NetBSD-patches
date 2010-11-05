@@ -1,0 +1,94 @@
+Mon Jul 19 12:54:47 JST 2010  Iku Iwasa <iku.iwasa@gmail.com>
+  * FFI wrappers for NetBSD
+diff -rN -u old-libraries/base/System/CPUTime.hsc new-libraries/base/System/CPUTime.hsc
+--- old-libraries/base/System/CPUTime.hsc	2010-11-05 16:21:35.000000000 +0900
++++ new-libraries/base/System/CPUTime.hsc	2010-11-05 16:21:35.000000000 +0900
+@@ -104,7 +104,7 @@
+                 * 1000000)
+ 
+ type CRUsage = ()
+-foreign import ccall unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
++foreign import ccall unsafe "__hscore_getrusage" getrusage :: CInt -> Ptr CRUsage -> IO CInt
+ #else
+ # if defined(HAVE_TIMES)
+     allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
+diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBase.h
+--- old-libraries/base/include/HsBase.h	2010-11-05 16:21:35.000000000 +0900
++++ new-libraries/base/include/HsBase.h	2010-11-05 16:21:35.000000000 +0900
+@@ -614,6 +614,10 @@
+ }
+ #endif
+ 
++INLINE int __hscore_getrusage(int who, struct rusage *rusage) {
++	return getrusage(who, rusage);
++}
++
+ // select-related stuff
+ 
+ #if !defined(__MINGW32__)
+diff -rN -u old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc
+--- old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2010-11-05 16:21:35.000000000 +0900
++++ new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2010-11-05 16:21:35.000000000 +0900
+@@ -62,7 +62,7 @@
+ ---------------------
+ -- Setting the locale
+ 
+-foreign import ccall "setlocale" c_setlocale :: CInt -> CString -> IO CString
++foreign import ccall "h_setlocale" c_setlocale :: CInt -> CString -> IO CString
+ 
+ setLocale :: Maybe String -> IO (Maybe String)
+ setLocale oldLocale = (maybeWith withCString) oldLocale $ \loc_p -> do
+diff -rN -u old-libraries/haskeline/cbits/h_iconv.c new-libraries/haskeline/cbits/h_iconv.c
+--- old-libraries/haskeline/cbits/h_iconv.c	2010-11-05 16:21:35.000000000 +0900
++++ new-libraries/haskeline/cbits/h_iconv.c	2010-11-05 16:21:35.000000000 +0900
+@@ -13,3 +13,8 @@
+                 char **outbuf, size_t *outbytesleft) {
+     return iconv(cd, inbuf, inbytesleft, outbuf, outbytesleft);
+ }
++
++char *h_setlocale(int category, const char *locale)
++{
++    return setlocale(category, locale);
++}
+diff -rN -u old-libraries/haskeline/includes/h_iconv.h new-libraries/haskeline/includes/h_iconv.h
+--- old-libraries/haskeline/includes/h_iconv.h	2010-11-05 16:21:35.000000000 +0900
++++ new-libraries/haskeline/includes/h_iconv.h	2010-11-05 16:21:35.000000000 +0900
+@@ -7,3 +7,4 @@
+ size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
+                 char **outbuf, size_t *outbytesleft);
+ 
++char *h_setlocale(int category, const char *locale);
+diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Data/Time/Clock/CTimeval.hs
+--- old-libraries/time/Data/Time/Clock/CTimeval.hs	2010-11-05 16:21:35.000000000 +0900
++++ new-libraries/time/Data/Time/Clock/CTimeval.hs	2010-11-05 16:21:35.000000000 +0900
+@@ -20,7 +20,7 @@
+ 		pokeElemOff (castPtr p) 0 s
+ 		pokeElemOff (castPtr p) 1 mus
+ 
+-foreign import ccall unsafe "time.h gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
++foreign import ccall unsafe "HsTime.h __hstime_gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
+ 
+ -- | Get the current POSIX time from the system clock.
+ getCTimeval :: IO CTimeval
+diff -rN -u old-libraries/time/cbits/HsTime.c new-libraries/time/cbits/HsTime.c
+--- old-libraries/time/cbits/HsTime.c	2010-11-05 16:21:35.000000000 +0900
++++ new-libraries/time/cbits/HsTime.c	2010-11-05 16:21:35.000000000 +0900
+@@ -38,3 +38,8 @@
+ 	}
+ 	else return 0x80000000;
+ }
++
++int __hstime_gettimeofday(struct timeval *tp, void *tzp)
++{
++	return gettimeofday(tp, tzp);
++}
+diff -rN -u old-libraries/time/include/HsTime.h new-libraries/time/include/HsTime.h
+--- old-libraries/time/include/HsTime.h	2010-11-05 16:21:35.000000000 +0900
++++ new-libraries/time/include/HsTime.h	2010-11-05 16:21:35.000000000 +0900
+@@ -20,4 +20,6 @@
+ 
+ long int get_current_timezone_seconds (time_t,int* pdst,char const* * pname);
+ 
++int __hstime_gettimeofday(struct timeval *tp, void *tzp);
++
+ #endif
