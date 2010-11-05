@@ -1,0 +1,208 @@
+Fri Nov  5 16:43:13 JST 2010  Iku Iwasa <iku.iwasa@gmail.com>
+  * FFI wrappers for NetBSD.
+diff -rN -u old-libraries/base/System/CPUTime.hsc new-libraries/base/System/CPUTime.hsc
+--- old-libraries/base/System/CPUTime.hsc	2010-11-05 16:43:25.000000000 +0900
++++ new-libraries/base/System/CPUTime.hsc	2010-11-05 16:43:25.000000000 +0900
+@@ -107,7 +107,7 @@
+                 * 1000000)
+ 
+ type CRUsage = ()
+-foreign import ccall unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
++foreign import ccall unsafe "__hscore_getrusage" getrusage :: CInt -> Ptr CRUsage -> IO CInt
+ #else
+ # if defined(HAVE_TIMES)
+     allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
+diff -rN -u old-libraries/base/System/Event/Clock.hsc new-libraries/base/System/Event/Clock.hsc
+--- old-libraries/base/System/Event/Clock.hsc	2010-11-05 16:43:25.000000000 +0900
++++ new-libraries/base/System/Event/Clock.hsc	2010-11-05 16:43:25.000000000 +0900
+@@ -44,5 +44,5 @@
+         #{poke struct timeval, tv_sec} ptr (sec tv)
+         #{poke struct timeval, tv_usec} ptr (usec tv)
+ 
+-foreign import ccall unsafe "sys/time.h gettimeofday" gettimeofday
++foreign import ccall unsafe "__hsbase_gettimeofday" gettimeofday
+     :: Ptr CTimeval -> Ptr () -> IO CInt
+diff -rN -u old-libraries/base/System/Event/KQueue.hsc new-libraries/base/System/Event/KQueue.hsc
+--- old-libraries/base/System/Event/KQueue.hsc	2010-11-05 16:43:25.000000000 +0900
++++ new-libraries/base/System/Event/KQueue.hsc	2010-11-05 16:43:25.000000000 +0900
+@@ -288,7 +288,7 @@
+     c_kevent64 :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
+                -> Ptr TimeSpec -> IO CInt
+ #elif defined(HAVE_KEVENT)
+-foreign import ccall safe "kevent"
++foreign import ccall safe "__hscore_kevent"
+     c_kevent :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
+              -> Ptr TimeSpec -> IO CInt
+ #else
+diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBase.h
+--- old-libraries/base/include/HsBase.h	2010-11-05 16:43:25.000000000 +0900
++++ new-libraries/base/include/HsBase.h	2010-11-05 16:43:25.000000000 +0900
+@@ -145,6 +145,10 @@
+ #include <sys/select.h>
+ #endif
+ 
++#if HAVE_SYS_EVENT_H
++#include <sys/event.h>
++#endif
++
+ /* in inputReady.c */
+ extern int fdReady(int fd, int write, int msecs, int isSock);
+ 
+@@ -614,6 +618,10 @@
+ }
+ #endif
+ 
++INLINE int __hscore_getrusage(int who, struct rusage *rusage) {
++	return getrusage(who, rusage);
++}
++
+ // select-related stuff
+ 
+ #if !defined(__MINGW32__)
+@@ -629,6 +637,18 @@
+ 	return (select(nfds,readfds,writefds,exceptfds,timeout));
+ }
+ 
++#ifdef HAVE_KQUEUE
++INLINE int __hscore_kevent(int kq, const struct kevent *changelist,
++                           size_t nchanges, struct kevent *eventlist,
++                           size_t nevents, const struct timespec *timeout) {
++        return kevent(kq, changelist, nchanges, eventlist, nevents, timeout);
++}
++#endif
++
++INLINE int __hsbase_gettimeofday(struct timeval *tp, void *tzp) {
++        return gettimeofday(tp, tzp);
++}
++
+ // gettimeofday()-related
+ 
+ #if !defined(__MINGW32__)
+diff -rN -u old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc
+--- old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2010-11-05 16:43:25.000000000 +0900
++++ new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2010-11-05 16:43:26.000000000 +0900
+@@ -62,7 +62,7 @@
+ ---------------------
+ -- Setting the locale
+ 
+-foreign import ccall "setlocale" c_setlocale :: CInt -> CString -> IO CString
++foreign import ccall "h_setlocale" c_setlocale :: CInt -> CString -> IO CString
+ 
+ setLocale :: Maybe String -> IO (Maybe String)
+ setLocale oldLocale = (maybeWith withCString) oldLocale $ \loc_p -> do
+diff -rN -u old-libraries/haskeline/cbits/h_iconv.c new-libraries/haskeline/cbits/h_iconv.c
+--- old-libraries/haskeline/cbits/h_iconv.c	2010-11-05 16:43:25.000000000 +0900
++++ new-libraries/haskeline/cbits/h_iconv.c	2010-11-05 16:43:26.000000000 +0900
+@@ -16,3 +16,8 @@
+     // a (char **).
+     return iconv(cd, (void*)inbuf, inbytesleft, outbuf, outbytesleft);
+ }
++
++char *h_setlocale(int category, const char *locale)
++{
++    return setlocale(category, locale);
++}
+diff -rN -u old-libraries/haskeline/includes/h_iconv.h new-libraries/haskeline/includes/h_iconv.h
+--- old-libraries/haskeline/includes/h_iconv.h	2010-11-05 16:43:25.000000000 +0900
++++ new-libraries/haskeline/includes/h_iconv.h	2010-11-05 16:43:26.000000000 +0900
+@@ -7,3 +7,4 @@
+ size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
+                 char **outbuf, size_t *outbytesleft);
+ 
++char *h_setlocale(int category, const char *locale);
+diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Data/Time/Clock/CTimeval.hs
+--- old-libraries/time/Data/Time/Clock/CTimeval.hs	2010-11-05 16:43:25.000000000 +0900
++++ new-libraries/time/Data/Time/Clock/CTimeval.hs	2010-11-05 16:43:26.000000000 +0900
+@@ -7,20 +7,37 @@
+ import Foreign
+ import Foreign.C
+ 
+-data CTimeval = MkCTimeval CLong CLong
++#include "HsTimeConfig.h"
++
++--
++-- we assume time_t and suseconds_t are either long long or long.
++--
++#if SIZEOF_TIME_T == SIZEOF_LONG_LONG
++type TimeT = CLLong
++#elif SIZEOF_TIME_T == SIZEOF_LONG
++type TimeT = CLong
++#endif
++
++#if SIZEOF_SUSECONDS_T == SIZEOF_LONG_LONG
++type SusecondsT = CLLong
++#elif SIZEOF_SUSECONDS_T == SIZEOF_LONG
++type SusecondsT = CLong
++#endif
++
++data CTimeval = MkCTimeval TimeT SusecondsT
+ 
+ instance Storable CTimeval where
+-	sizeOf _ = (sizeOf (undefined :: CLong)) * 2
++	sizeOf _ = sizeOf (undefined :: TimeT) + sizeOf (undefined :: SusecondsT)
+ 	alignment _ = alignment (undefined :: CLong)
+ 	peek p = do
+-		s   <- peekElemOff (castPtr p) 0
+-		mus <- peekElemOff (castPtr p) 1
++		s   <- peekByteOff p 0
++		mus <- peekByteOff p (sizeOf (undefined :: TimeT))
+ 		return (MkCTimeval s mus)
+ 	poke p (MkCTimeval s mus) = do
+-		pokeElemOff (castPtr p) 0 s
+-		pokeElemOff (castPtr p) 1 mus
++		pokeByteOff p 0 s
++		pokeByteOff p (sizeOf (undefined :: TimeT)) mus
+ 
+-foreign import ccall unsafe "time.h gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
++foreign import ccall unsafe "HsTime.h __hstime_gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
+ 
+ -- | Get the current POSIX time from the system clock.
+ getCTimeval :: IO CTimeval
+diff -rN -u old-libraries/time/cbits/HsTime.c new-libraries/time/cbits/HsTime.c
+--- old-libraries/time/cbits/HsTime.c	2010-11-05 16:43:25.000000000 +0900
++++ new-libraries/time/cbits/HsTime.c	2010-11-05 16:43:26.000000000 +0900
+@@ -38,3 +38,8 @@
+ 	}
+ 	else return 0x80000000;
+ }
++
++int __hstime_gettimeofday(struct timeval *tv, void *tz)
++{
++	return gettimeofday(tv, tz);
++}
+diff -rN -u old-libraries/time/configure.ac new-libraries/time/configure.ac
+--- old-libraries/time/configure.ac	2010-11-05 16:43:25.000000000 +0900
++++ new-libraries/time/configure.ac	2010-11-05 16:43:26.000000000 +0900
+@@ -12,6 +12,10 @@
+ 
+ AC_CHECK_HEADERS([time.h])
+ AC_CHECK_FUNCS([gmtime_r localtime_r])
++AC_CHECK_SIZEOF([time_t])
++AC_CHECK_SIZEOF([suseconds_t])
++AC_CHECK_SIZEOF([long])
++AC_CHECK_SIZEOF([long long])
+ 
+ AC_STRUCT_TM
+ AC_STRUCT_TIMEZONE
+diff -rN -u old-libraries/time/include/HsTime.h new-libraries/time/include/HsTime.h
+--- old-libraries/time/include/HsTime.h	2010-11-05 16:43:25.000000000 +0900
++++ new-libraries/time/include/HsTime.h	2010-11-05 16:43:26.000000000 +0900
+@@ -19,5 +19,6 @@
+ #endif
+ 
+ long int get_current_timezone_seconds (time_t,int* pdst,char const* * pname);
++int __hstime_gettimeofday(struct timeval*, void*);
+ 
+ #endif
+diff -rN -u old-libraries/time/test/Makefile new-libraries/time/test/Makefile
+--- old-libraries/time/test/Makefile	2010-11-05 16:43:25.000000000 +0900
++++ new-libraries/time/test/Makefile	2010-11-05 16:43:26.000000000 +0900
+@@ -2,7 +2,7 @@
+ GHCFLAGS = -package time
+ 
+ default:
+-	make CurrentTime.run ShowDST.run test
++	$(MAKE) CurrentTime.run ShowDST.run test
+ 
+ TestMonthDay: TestMonthDay.o
+ 	$(GHC) $(GHCFLAGS) $^ -o $@
