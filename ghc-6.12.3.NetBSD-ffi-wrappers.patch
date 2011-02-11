@@ -1,8 +1,8 @@
-Mon Jul 19 12:54:47 JST 2010  Iku Iwasa <iku.iwasa@gmail.com>
+Fri Feb 11 15:51:59 JST 2011  Iku Iwasa <iku.iwasa@gmail.com>
   * FFI wrappers for NetBSD
 diff -rN -u old-libraries/base/System/CPUTime.hsc new-libraries/base/System/CPUTime.hsc
---- old-libraries/base/System/CPUTime.hsc	2010-11-05 16:21:35.000000000 +0900
-+++ new-libraries/base/System/CPUTime.hsc	2010-11-05 16:21:35.000000000 +0900
+--- old-libraries/base/System/CPUTime.hsc	2011-02-11 15:52:32.000000000 +0900
++++ new-libraries/base/System/CPUTime.hsc	2011-02-11 15:52:32.000000000 +0900
 @@ -104,7 +104,7 @@
                  * 1000000)
  
@@ -13,8 +13,8 @@ diff -rN -u old-libraries/base/System/CPUTime.hsc new-libraries/base/System/CPUT
  # if defined(HAVE_TIMES)
      allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
 diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBase.h
---- old-libraries/base/include/HsBase.h	2010-11-05 16:21:35.000000000 +0900
-+++ new-libraries/base/include/HsBase.h	2010-11-05 16:21:35.000000000 +0900
+--- old-libraries/base/include/HsBase.h	2011-02-11 15:52:32.000000000 +0900
++++ new-libraries/base/include/HsBase.h	2011-02-11 15:52:32.000000000 +0900
 @@ -614,6 +614,10 @@
  }
  #endif
@@ -27,8 +27,8 @@ diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBas
  
  #if !defined(__MINGW32__)
 diff -rN -u old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc
---- old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2010-11-05 16:21:35.000000000 +0900
-+++ new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2010-11-05 16:21:35.000000000 +0900
+--- old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-02-11 15:52:32.000000000 +0900
++++ new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-02-11 15:52:33.000000000 +0900
 @@ -62,7 +62,7 @@
  ---------------------
  -- Setting the locale
@@ -39,8 +39,8 @@ diff -rN -u old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc n
  setLocale :: Maybe String -> IO (Maybe String)
  setLocale oldLocale = (maybeWith withCString) oldLocale $ \loc_p -> do
 diff -rN -u old-libraries/haskeline/cbits/h_iconv.c new-libraries/haskeline/cbits/h_iconv.c
---- old-libraries/haskeline/cbits/h_iconv.c	2010-11-05 16:21:35.000000000 +0900
-+++ new-libraries/haskeline/cbits/h_iconv.c	2010-11-05 16:21:35.000000000 +0900
+--- old-libraries/haskeline/cbits/h_iconv.c	2011-02-11 15:52:32.000000000 +0900
++++ new-libraries/haskeline/cbits/h_iconv.c	2011-02-11 15:52:33.000000000 +0900
 @@ -13,3 +13,8 @@
                  char **outbuf, size_t *outbytesleft) {
      return iconv(cd, inbuf, inbytesleft, outbuf, outbytesleft);
@@ -51,19 +51,64 @@ diff -rN -u old-libraries/haskeline/cbits/h_iconv.c new-libraries/haskeline/cbit
 +    return setlocale(category, locale);
 +}
 diff -rN -u old-libraries/haskeline/includes/h_iconv.h new-libraries/haskeline/includes/h_iconv.h
---- old-libraries/haskeline/includes/h_iconv.h	2010-11-05 16:21:35.000000000 +0900
-+++ new-libraries/haskeline/includes/h_iconv.h	2010-11-05 16:21:35.000000000 +0900
+--- old-libraries/haskeline/includes/h_iconv.h	2011-02-11 15:52:32.000000000 +0900
++++ new-libraries/haskeline/includes/h_iconv.h	2011-02-11 15:52:33.000000000 +0900
 @@ -7,3 +7,4 @@
  size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
                  char **outbuf, size_t *outbytesleft);
  
 +char *h_setlocale(int category, const char *locale);
 diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Data/Time/Clock/CTimeval.hs
---- old-libraries/time/Data/Time/Clock/CTimeval.hs	2010-11-05 16:21:35.000000000 +0900
-+++ new-libraries/time/Data/Time/Clock/CTimeval.hs	2010-11-05 16:21:35.000000000 +0900
-@@ -20,7 +20,7 @@
- 		pokeElemOff (castPtr p) 0 s
- 		pokeElemOff (castPtr p) 1 mus
+--- old-libraries/time/Data/Time/Clock/CTimeval.hs	2011-02-11 15:52:32.000000000 +0900
++++ new-libraries/time/Data/Time/Clock/CTimeval.hs	2011-02-11 15:52:33.000000000 +0900
+@@ -7,20 +7,42 @@
+ import Foreign
+ import Foreign.C
+ 
+-data CTimeval = MkCTimeval CLong CLong
++#include "HsTimeConfig.h"
++
++
++--
++-- we assume time_t and suseconds_t are either long long or long.
++--
++#ifndef SIZEOF_TIME_T
++#error "SIZEOF_TIME_T is not defined, run autoreconf!"
++#endif
++#if SIZEOF_TIME_T == SIZEOF_LONG_LONG
++type TimeT = CLLong
++#elif SIZEOF_TIME_T == SIZEOF_LONG
++type TimeT = CLong
++#endif
++
++#if SIZEOF_SUSECONDS_T == SIZEOF_LONG_LONG
++type SusecondsT = CLLong
++#elif SIZEOF_SUSECONDS_T == SIZEOF_LONG
++type SusecondsT = CLong
++#endif
++
++data CTimeval = MkCTimeval TimeT SusecondsT
++
+ 
+ instance Storable CTimeval where
+-	sizeOf _ = (sizeOf (undefined :: CLong)) * 2
+-	alignment _ = alignment (undefined :: CLong)
+-	peek p = do
+-		s   <- peekElemOff (castPtr p) 0
+-		mus <- peekElemOff (castPtr p) 1
+-		return (MkCTimeval s mus)
+-	poke p (MkCTimeval s mus) = do
+-		pokeElemOff (castPtr p) 0 s
+-		pokeElemOff (castPtr p) 1 mus
++    sizeOf _ = sizeOf (undefined :: TimeT) + sizeOf (undefined :: SusecondsT)
++    alignment _ = alignment (undefined :: CLong)
++    peek p = do
++        s   <- peekByteOff p 0
++        mus <- peekByteOff p (sizeOf (undefined :: TimeT))
++        return (MkCTimeval s mus)
++    poke p (MkCTimeval s mus) = do
++        pokeByteOff p 0 s
++        pokeByteOff p (sizeOf (undefined :: TimeT)) mus
  
 -foreign import ccall unsafe "time.h gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
 +foreign import ccall unsafe "HsTime.h __hstime_gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
@@ -71,8 +116,8 @@ diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Da
  -- | Get the current POSIX time from the system clock.
  getCTimeval :: IO CTimeval
 diff -rN -u old-libraries/time/cbits/HsTime.c new-libraries/time/cbits/HsTime.c
---- old-libraries/time/cbits/HsTime.c	2010-11-05 16:21:35.000000000 +0900
-+++ new-libraries/time/cbits/HsTime.c	2010-11-05 16:21:35.000000000 +0900
+--- old-libraries/time/cbits/HsTime.c	2011-02-11 15:52:32.000000000 +0900
++++ new-libraries/time/cbits/HsTime.c	2011-02-11 15:52:33.000000000 +0900
 @@ -38,3 +38,8 @@
  	}
  	else return 0x80000000;
@@ -82,9 +127,23 @@ diff -rN -u old-libraries/time/cbits/HsTime.c new-libraries/time/cbits/HsTime.c
 +{
 +	return gettimeofday(tp, tzp);
 +}
+diff -rN -u old-libraries/time/configure.ac new-libraries/time/configure.ac
+--- old-libraries/time/configure.ac	2011-02-11 15:52:32.000000000 +0900
++++ new-libraries/time/configure.ac	2011-02-11 15:52:33.000000000 +0900
+@@ -12,6 +12,10 @@
+ 
+ AC_CHECK_HEADERS([time.h])
+ AC_CHECK_FUNCS([gmtime_r localtime_r])
++AC_CHECK_SIZEOF([time_t])
++AC_CHECK_SIZEOF([suseconds_t])
++AC_CHECK_SIZEOF([long])
++AC_CHECK_SIZEOF([long long])
+ 
+ AC_STRUCT_TM
+ AC_STRUCT_TIMEZONE
 diff -rN -u old-libraries/time/include/HsTime.h new-libraries/time/include/HsTime.h
---- old-libraries/time/include/HsTime.h	2010-11-05 16:21:35.000000000 +0900
-+++ new-libraries/time/include/HsTime.h	2010-11-05 16:21:35.000000000 +0900
+--- old-libraries/time/include/HsTime.h	2011-02-11 15:52:32.000000000 +0900
++++ new-libraries/time/include/HsTime.h	2011-02-11 15:52:33.000000000 +0900
 @@ -20,4 +20,6 @@
  
  long int get_current_timezone_seconds (time_t,int* pdst,char const* * pname);

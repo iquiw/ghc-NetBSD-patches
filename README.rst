@@ -39,12 +39,15 @@ How to use?
 
     $ patch -p1 < /somewhere/ghc-x.x.x.NetBSD-ffi-wrappers.patch
 
-4. Run autoreconf (only for GHC 7)::
+4. Run autoreconf in time::
 
-    $ (cd base && autoreconf)
     $ (cd time && autoreconf)
 
-5. Build ghc.
+5. Run autoreconf in base (only for GHC 7)::
+
+    $ (cd base && autoreconf)
+
+6. Build ghc.
 
 -----------------
 Supported version
@@ -54,8 +57,3 @@ ghc-6.12.3.NetBSD-ffi-wrappers.patch
 
 ghc-7.0.1.NetBSD-ffi-wrappers.patch
    ghc-7.0.1 RC2, ghc-7.0.1, ghc-7.0.2 RC1
-
----
-Bug
----
-ghc-6.12.3.NetBSD-ffi-wrappers.patch has a bug in time library if time_t is 64bit, which is fixed in ghc-7.0.1.NetBSD-ffi-wrappers.patch.
