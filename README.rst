@@ -55,5 +55,5 @@ Supported version
 ghc-6.12.3.NetBSD-ffi-wrappers.patch
    ghc-6.12.3 
 
-ghc-7.0.1.NetBSD-ffi-wrappers.patch
-   ghc-7.0.1 RC2, ghc-7.0.1, ghc-7.0.2 RC1
+ghc-7.0.3.NetBSD-ffi-wrappers.patch
+   ghc-7.0.1, ghc-7.0.2, ghc-7.0.3
