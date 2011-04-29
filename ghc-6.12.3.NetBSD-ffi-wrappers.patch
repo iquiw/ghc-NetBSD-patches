@@ -1,8 +1,8 @@
-Fri Feb 11 15:51:59 JST 2011  Iku Iwasa <iku.iwasa@gmail.com>
-  * FFI wrappers for NetBSD
+Fri Apr 29 11:42:15 JST 2011  Iku Iwasa <iku.iwasa@gmail.com>
+  * FFI wrappers for NetBSD.
 diff -rN -u old-libraries/base/System/CPUTime.hsc new-libraries/base/System/CPUTime.hsc
---- old-libraries/base/System/CPUTime.hsc	2011-02-11 15:52:32.000000000 +0900
-+++ new-libraries/base/System/CPUTime.hsc	2011-02-11 15:52:32.000000000 +0900
+--- old-libraries/base/System/CPUTime.hsc	2011-04-29 11:43:28.000000000 +0900
++++ new-libraries/base/System/CPUTime.hsc	2011-04-29 11:43:28.000000000 +0900
 @@ -104,7 +104,7 @@
                  * 1000000)
  
@@ -12,10 +12,42 @@ diff -rN -u old-libraries/base/System/CPUTime.hsc new-libraries/base/System/CPUT
  #else
  # if defined(HAVE_TIMES)
      allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
+diff -rN -u old-libraries/base/System/Posix/Internals.hs new-libraries/base/System/Posix/Internals.hs
+--- old-libraries/base/System/Posix/Internals.hs	2011-04-29 11:43:28.000000000 +0900
++++ new-libraries/base/System/Posix/Internals.hs	2011-04-29 11:43:28.000000000 +0900
+@@ -448,7 +448,7 @@
+ foreign import ccall unsafe "HsBase.h __hscore_sigaddset"
+    c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
+ 
+-foreign import ccall unsafe "HsBase.h sigprocmask"
++foreign import ccall unsafe "HsBase.h __hscore_sigprocmask"
+    c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
+ 
+ foreign import ccall unsafe "HsBase.h tcgetattr"
 diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBase.h
---- old-libraries/base/include/HsBase.h	2011-02-11 15:52:32.000000000 +0900
-+++ new-libraries/base/include/HsBase.h	2011-02-11 15:52:32.000000000 +0900
-@@ -614,6 +614,10 @@
+--- old-libraries/base/include/HsBase.h	2011-04-29 11:43:28.000000000 +0900
++++ new-libraries/base/include/HsBase.h	2011-04-29 11:43:28.000000000 +0900
+@@ -203,6 +203,19 @@
+ { return sigismember(set,s); }
+ 
+ INLINE int
++__hscore_sigprocmask( int how, sigset_t * set, sigset_t * oset )
++{ return sigprocmask(how,set,oset); }
++
++INLINE int
++__hscore_sigpending( sigset_t * set )
++{ return sigpending(set); }
++
++INLINE int
++__hscore_sigsuspend( sigset_t * set )
++{ return sigsuspend(set); }
++
++
++INLINE int
+ __hscore_utime( const char *file, const struct utimbuf *timep )
+ { return utime(file,timep); }
+ #endif
+@@ -614,6 +627,10 @@
  }
  #endif
  
@@ -27,8 +59,8 @@ diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBas
  
  #if !defined(__MINGW32__)
 diff -rN -u old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc
---- old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-02-11 15:52:32.000000000 +0900
-+++ new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-02-11 15:52:33.000000000 +0900
+--- old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-04-29 11:43:28.000000000 +0900
++++ new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-04-29 11:43:29.000000000 +0900
 @@ -62,7 +62,7 @@
  ---------------------
  -- Setting the locale
@@ -39,8 +71,8 @@ diff -rN -u old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc n
  setLocale :: Maybe String -> IO (Maybe String)
  setLocale oldLocale = (maybeWith withCString) oldLocale $ \loc_p -> do
 diff -rN -u old-libraries/haskeline/cbits/h_iconv.c new-libraries/haskeline/cbits/h_iconv.c
---- old-libraries/haskeline/cbits/h_iconv.c	2011-02-11 15:52:32.000000000 +0900
-+++ new-libraries/haskeline/cbits/h_iconv.c	2011-02-11 15:52:33.000000000 +0900
+--- old-libraries/haskeline/cbits/h_iconv.c	2011-04-29 11:43:28.000000000 +0900
++++ new-libraries/haskeline/cbits/h_iconv.c	2011-04-29 11:43:29.000000000 +0900
 @@ -13,3 +13,8 @@
                  char **outbuf, size_t *outbytesleft) {
      return iconv(cd, inbuf, inbytesleft, outbuf, outbytesleft);
@@ -51,16 +83,16 @@ diff -rN -u old-libraries/haskeline/cbits/h_iconv.c new-libraries/haskeline/cbit
 +    return setlocale(category, locale);
 +}
 diff -rN -u old-libraries/haskeline/includes/h_iconv.h new-libraries/haskeline/includes/h_iconv.h
---- old-libraries/haskeline/includes/h_iconv.h	2011-02-11 15:52:32.000000000 +0900
-+++ new-libraries/haskeline/includes/h_iconv.h	2011-02-11 15:52:33.000000000 +0900
+--- old-libraries/haskeline/includes/h_iconv.h	2011-04-29 11:43:28.000000000 +0900
++++ new-libraries/haskeline/includes/h_iconv.h	2011-04-29 11:43:29.000000000 +0900
 @@ -7,3 +7,4 @@
  size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
                  char **outbuf, size_t *outbytesleft);
  
 +char *h_setlocale(int category, const char *locale);
 diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Data/Time/Clock/CTimeval.hs
---- old-libraries/time/Data/Time/Clock/CTimeval.hs	2011-02-11 15:52:32.000000000 +0900
-+++ new-libraries/time/Data/Time/Clock/CTimeval.hs	2011-02-11 15:52:33.000000000 +0900
+--- old-libraries/time/Data/Time/Clock/CTimeval.hs	2011-04-29 11:43:28.000000000 +0900
++++ new-libraries/time/Data/Time/Clock/CTimeval.hs	2011-04-29 11:43:29.000000000 +0900
 @@ -7,20 +7,42 @@
  import Foreign
  import Foreign.C
@@ -116,8 +148,8 @@ diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Da
  -- | Get the current POSIX time from the system clock.
  getCTimeval :: IO CTimeval
 diff -rN -u old-libraries/time/cbits/HsTime.c new-libraries/time/cbits/HsTime.c
---- old-libraries/time/cbits/HsTime.c	2011-02-11 15:52:32.000000000 +0900
-+++ new-libraries/time/cbits/HsTime.c	2011-02-11 15:52:33.000000000 +0900
+--- old-libraries/time/cbits/HsTime.c	2011-04-29 11:43:28.000000000 +0900
++++ new-libraries/time/cbits/HsTime.c	2011-04-29 11:43:29.000000000 +0900
 @@ -38,3 +38,8 @@
  	}
  	else return 0x80000000;
@@ -128,8 +160,8 @@ diff -rN -u old-libraries/time/cbits/HsTime.c new-libraries/time/cbits/HsTime.c
 +	return gettimeofday(tp, tzp);
 +}
 diff -rN -u old-libraries/time/configure.ac new-libraries/time/configure.ac
---- old-libraries/time/configure.ac	2011-02-11 15:52:32.000000000 +0900
-+++ new-libraries/time/configure.ac	2011-02-11 15:52:33.000000000 +0900
+--- old-libraries/time/configure.ac	2011-04-29 11:43:28.000000000 +0900
++++ new-libraries/time/configure.ac	2011-04-29 11:43:29.000000000 +0900
 @@ -12,6 +12,10 @@
  
  AC_CHECK_HEADERS([time.h])
@@ -142,8 +174,8 @@ diff -rN -u old-libraries/time/configure.ac new-libraries/time/configure.ac
  AC_STRUCT_TM
  AC_STRUCT_TIMEZONE
 diff -rN -u old-libraries/time/include/HsTime.h new-libraries/time/include/HsTime.h
---- old-libraries/time/include/HsTime.h	2011-02-11 15:52:32.000000000 +0900
-+++ new-libraries/time/include/HsTime.h	2011-02-11 15:52:33.000000000 +0900
+--- old-libraries/time/include/HsTime.h	2011-04-29 11:43:28.000000000 +0900
++++ new-libraries/time/include/HsTime.h	2011-04-29 11:43:29.000000000 +0900
 @@ -20,4 +20,6 @@
  
  long int get_current_timezone_seconds (time_t,int* pdst,char const* * pname);
@@ -151,3 +183,23 @@ diff -rN -u old-libraries/time/include/HsTime.h new-libraries/time/include/HsTim
 +int __hstime_gettimeofday(struct timeval *tp, void *tzp);
 +
  #endif
+diff -rN -u old-libraries/unix/System/Posix/Signals.hsc new-libraries/unix/System/Posix/Signals.hsc
+--- old-libraries/unix/System/Posix/Signals.hsc	2011-04-29 11:43:28.000000000 +0900
++++ new-libraries/unix/System/Posix/Signals.hsc	2011-04-29 11:43:29.000000000 +0900
+@@ -581,7 +581,7 @@
+   -- XXX My manpage says it can also return EFAULT. And why is ignoring
+   -- EINTR the right thing to do?
+  
+-foreign import ccall unsafe "sigsuspend"
++foreign import ccall unsafe "__hscore_sigsuspend"
+   c_sigsuspend :: Ptr CSigset -> IO CInt
+ #endif
+ 
+@@ -605,6 +605,6 @@
+   c_sigismember :: Ptr CSigset -> CInt -> IO CInt
+ #endif /* __HUGS__ */
+ 
+-foreign import ccall unsafe "sigpending"
++foreign import ccall unsafe "__hscore_sigpending"
+   c_sigpending :: Ptr CSigset -> IO CInt
+ 
