@@ -1,9 +1,9 @@
-Fri Apr  8 11:47:25 JST 2011  Iku Iwasa <iku.iwasa@gmail.com>
+Sat Jun 18 15:45:52 JST 2011  Iku Iwasa <iku.iwasa@gmail.com>
   * FFI wrappers for NetBSD.
 diff -rN -u old-libraries/base/System/CPUTime.hsc new-libraries/base/System/CPUTime.hsc
---- old-libraries/base/System/CPUTime.hsc	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/base/System/CPUTime.hsc	2011-04-09 11:06:33.000000000 +0900
-@@ -107,7 +107,7 @@
+--- old-libraries/base/System/CPUTime.hsc	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/base/System/CPUTime.hsc	2011-06-18 15:46:20.000000000 +0900
+@@ -115,7 +115,7 @@
                  * 1000000)
  
  type CRUsage = ()
@@ -13,9 +13,9 @@ diff -rN -u old-libraries/base/System/CPUTime.hsc new-libraries/base/System/CPUT
  # if defined(HAVE_TIMES)
      allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
 diff -rN -u old-libraries/base/System/Event/Clock.hsc new-libraries/base/System/Event/Clock.hsc
---- old-libraries/base/System/Event/Clock.hsc	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/base/System/Event/Clock.hsc	2011-04-09 11:06:33.000000000 +0900
-@@ -44,5 +44,5 @@
+--- old-libraries/base/System/Event/Clock.hsc	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/base/System/Event/Clock.hsc	2011-06-18 15:46:20.000000000 +0900
+@@ -48,5 +48,5 @@
          #{poke struct timeval, tv_sec} ptr (sec tv)
          #{poke struct timeval, tv_usec} ptr (usec tv)
  
@@ -23,8 +23,8 @@ diff -rN -u old-libraries/base/System/Event/Clock.hsc new-libraries/base/System/
 +foreign import ccall unsafe "__hsbase_gettimeofday" gettimeofday
      :: Ptr CTimeval -> Ptr () -> IO CInt
 diff -rN -u old-libraries/base/System/Event/KQueue.hsc new-libraries/base/System/Event/KQueue.hsc
---- old-libraries/base/System/Event/KQueue.hsc	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/base/System/Event/KQueue.hsc	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/base/System/Event/KQueue.hsc	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/base/System/Event/KQueue.hsc	2011-06-18 15:46:20.000000000 +0900
 @@ -24,7 +24,7 @@
  import Control.Concurrent.MVar (MVar, newMVar, swapMVar, withMVar)
  import Control.Monad (when, unless)
@@ -107,8 +107,8 @@ diff -rN -u old-libraries/base/System/Event/KQueue.hsc new-libraries/base/System
               -> Ptr TimeSpec -> IO CInt
  #else
 diff -rN -u old-libraries/base/System/Posix/Internals.hs new-libraries/base/System/Posix/Internals.hs
---- old-libraries/base/System/Posix/Internals.hs	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/base/System/Posix/Internals.hs	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/base/System/Posix/Internals.hs	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/base/System/Posix/Internals.hs	2011-06-18 15:46:20.000000000 +0900
 @@ -451,7 +451,7 @@
  foreign import ccall unsafe "HsBase.h __hscore_sigaddset"
     c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
@@ -119,8 +119,8 @@ diff -rN -u old-libraries/base/System/Posix/Internals.hs new-libraries/base/Syst
  
  foreign import ccall unsafe "HsBase.h tcgetattr"
 diff -rN -u old-libraries/base/configure.ac new-libraries/base/configure.ac
---- old-libraries/base/configure.ac	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/base/configure.ac	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/base/configure.ac	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/base/configure.ac	2011-06-18 15:46:21.000000000 +0900
 @@ -42,6 +42,15 @@
  
  if test "$ac_cv_header_sys_event_h" = yes -a "$ac_cv_func_kqueue" = yes; then
@@ -138,8 +138,8 @@ diff -rN -u old-libraries/base/configure.ac new-libraries/base/configure.ac
  
  if test "$ac_cv_header_poll_h" = yes -a "$ac_cv_func_poll" = yes; then
 diff -rN -u old-libraries/base/include/EventConfig.h.in new-libraries/base/include/EventConfig.h.in
---- old-libraries/base/include/EventConfig.h.in	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/base/include/EventConfig.h.in	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/base/include/EventConfig.h.in	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/base/include/EventConfig.h.in	2011-06-18 15:46:21.000000000 +0900
 @@ -83,3 +83,12 @@
  
  /* Define to 1 if you have the ANSI C header files. */
@@ -154,8 +154,8 @@ diff -rN -u old-libraries/base/include/EventConfig.h.in new-libraries/base/inclu
 +/* The size of `kev.data', as computed by sizeof. */
 +#undef SIZEOF_KEV_DATA
 diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBase.h
---- old-libraries/base/include/HsBase.h	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/base/include/HsBase.h	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/base/include/HsBase.h	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/base/include/HsBase.h	2011-06-18 15:46:21.000000000 +0900
 @@ -145,6 +145,10 @@
  #include <sys/select.h>
  #endif
@@ -217,8 +217,8 @@ diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBas
  
  #if !defined(__MINGW32__)
 diff -rN -u old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc
---- old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-06-18 15:46:21.000000000 +0900
 @@ -62,7 +62,7 @@
  ---------------------
  -- Setting the locale
@@ -229,8 +229,8 @@ diff -rN -u old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc n
  setLocale :: Maybe String -> IO (Maybe String)
  setLocale oldLocale = (maybeWith withCString) oldLocale $ \loc_p -> do
 diff -rN -u old-libraries/haskeline/cbits/h_iconv.c new-libraries/haskeline/cbits/h_iconv.c
---- old-libraries/haskeline/cbits/h_iconv.c	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/haskeline/cbits/h_iconv.c	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/haskeline/cbits/h_iconv.c	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/haskeline/cbits/h_iconv.c	2011-06-18 15:46:21.000000000 +0900
 @@ -16,3 +16,8 @@
      // a (char **).
      return iconv(cd, (void*)inbuf, inbytesleft, outbuf, outbytesleft);
@@ -241,16 +241,16 @@ diff -rN -u old-libraries/haskeline/cbits/h_iconv.c new-libraries/haskeline/cbit
 +    return setlocale(category, locale);
 +}
 diff -rN -u old-libraries/haskeline/includes/h_iconv.h new-libraries/haskeline/includes/h_iconv.h
---- old-libraries/haskeline/includes/h_iconv.h	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/haskeline/includes/h_iconv.h	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/haskeline/includes/h_iconv.h	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/haskeline/includes/h_iconv.h	2011-06-18 15:46:21.000000000 +0900
 @@ -7,3 +7,4 @@
  size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
                  char **outbuf, size_t *outbytesleft);
  
 +char *h_setlocale(int category, const char *locale);
 diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Data/Time/Clock/CTimeval.hs
---- old-libraries/time/Data/Time/Clock/CTimeval.hs	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/time/Data/Time/Clock/CTimeval.hs	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/time/Data/Time/Clock/CTimeval.hs	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/time/Data/Time/Clock/CTimeval.hs	2011-06-18 15:46:21.000000000 +0900
 @@ -7,20 +7,40 @@
  import Foreign
  import Foreign.C
@@ -300,8 +300,8 @@ diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Da
  -- | Get the current POSIX time from the system clock.
  getCTimeval :: IO CTimeval
 diff -rN -u old-libraries/time/cbits/HsTime.c new-libraries/time/cbits/HsTime.c
---- old-libraries/time/cbits/HsTime.c	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/time/cbits/HsTime.c	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/time/cbits/HsTime.c	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/time/cbits/HsTime.c	2011-06-18 15:46:21.000000000 +0900
 @@ -38,3 +38,8 @@
  	}
  	else return 0x80000000;
@@ -312,8 +312,8 @@ diff -rN -u old-libraries/time/cbits/HsTime.c new-libraries/time/cbits/HsTime.c
 +	return gettimeofday(tv, tz);
 +}
 diff -rN -u old-libraries/time/configure.ac new-libraries/time/configure.ac
---- old-libraries/time/configure.ac	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/time/configure.ac	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/time/configure.ac	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/time/configure.ac	2011-06-18 15:46:21.000000000 +0900
 @@ -12,6 +12,10 @@
  
  AC_CHECK_HEADERS([time.h])
@@ -326,8 +326,8 @@ diff -rN -u old-libraries/time/configure.ac new-libraries/time/configure.ac
  AC_STRUCT_TM
  AC_STRUCT_TIMEZONE
 diff -rN -u old-libraries/time/include/HsTime.h new-libraries/time/include/HsTime.h
---- old-libraries/time/include/HsTime.h	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/time/include/HsTime.h	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/time/include/HsTime.h	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/time/include/HsTime.h	2011-06-18 15:46:21.000000000 +0900
 @@ -19,5 +19,6 @@
  #endif
  
@@ -336,8 +336,8 @@ diff -rN -u old-libraries/time/include/HsTime.h new-libraries/time/include/HsTim
  
  #endif
 diff -rN -u old-libraries/time/test/Makefile new-libraries/time/test/Makefile
---- old-libraries/time/test/Makefile	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/time/test/Makefile	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/time/test/Makefile	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/time/test/Makefile	2011-06-18 15:46:21.000000000 +0900
 @@ -2,7 +2,7 @@
  GHCFLAGS = -package time
  
@@ -348,8 +348,8 @@ diff -rN -u old-libraries/time/test/Makefile new-libraries/time/test/Makefile
  TestMonthDay: TestMonthDay.o
  	$(GHC) $(GHCFLAGS) $^ -o $@
 diff -rN -u old-libraries/unix/System/Posix/Signals.hsc new-libraries/unix/System/Posix/Signals.hsc
---- old-libraries/unix/System/Posix/Signals.hsc	2011-04-09 11:06:32.000000000 +0900
-+++ new-libraries/unix/System/Posix/Signals.hsc	2011-04-09 11:06:33.000000000 +0900
+--- old-libraries/unix/System/Posix/Signals.hsc	2011-06-18 15:46:20.000000000 +0900
++++ new-libraries/unix/System/Posix/Signals.hsc	2011-06-18 15:46:21.000000000 +0900
 @@ -595,7 +595,7 @@
    -- XXX My manpage says it can also return EFAULT. And why is ignoring
    -- EINTR the right thing to do?
