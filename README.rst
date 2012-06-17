@@ -35,15 +35,9 @@ How to use?
     $ tar xzf ghc-x.x.x.tar.gz
     $ cd ghc-x.x.x/libraries
 
-3. Apply the patch
+3. Apply the patch::
 
-   * For GHC-7.4.x::
-
-       $ patch -p2 < /somewhere/ghc-x.x.x.NetBSD-ffi-wrappers.patch
-
-   * For GHC-7.0.x, GHC-6.12.3::
-
-       $ patch -p1 < /somewhere/ghc-x.x.x.NetBSD-ffi-wrappers.patch
+    $ patch -p1 < /somewhere/ghc-x.x.x.NetBSD-ffi-wrappers.patch
 
 4. Run autoreconf in time::
 
@@ -53,7 +47,7 @@ How to use?
 
     $ (cd base && autoreconf)
 
-6. Build ghc.
+6. Build ghc. (Requires working ghc)
 
 -----------------
 Supported version
@@ -64,5 +58,5 @@ ghc-6.12.3.NetBSD-ffi-wrappers.patch
 ghc-7.0.4.NetBSD-ffi-wrappers.patch
    ghc-7.0.1, ghc-7.0.2, ghc-7.0.3, ghc-7.0.4
 
-ghc-7.4.1.NetBSD-ffi-wrappers.patch
-   ghc-7.4.1
+ghc-7.4.2.NetBSD-ffi-wrappers.patch
+   ghc-7.4.1, ghc-7.4.2

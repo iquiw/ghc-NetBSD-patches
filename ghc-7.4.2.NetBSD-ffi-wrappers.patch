@@ -1,26 +1,26 @@
-From e4ec60265023731568e08b4bab975087688dc9e5 Mon Sep 17 00:00:00 2001
+From 0a3359cc67d66eebcab21c343f454508a5109764 Mon Sep 17 00:00:00 2001
 From: Iku Iwasa <iku.iwasa@gmail.com>
-Date: Mon, 6 Feb 2012 14:03:06 +0900
+Date: Sat, 16 Jun 2012 17:41:41 +0900
 Subject: [PATCH] FFI wrappers and type changes for NetBSD.
 
 ---
- base/GHC/Event/KQueue.hsc                          |   30 +++++++++++++++--
+ base/GHC/Event/KQueue.hsc                          |   30 ++++++++++++++---
  base/System/Posix/Internals.hs                     |    2 +-
- base/configure.ac                                  |    9 +++++
- base/include/EventConfig.h.in                      |    9 +++++
+ base/configure.ac                                  |    9 ++++++
+ base/include/EventConfig.h.in                      |    9 ++++++
  base/include/HsBase.h                              |   29 +++++++++++++++++
  .../System/Console/Haskeline/Backend/IConv.hsc     |    2 +-
  haskeline/cbits/h_iconv.c                          |    5 +++
  haskeline/includes/h_iconv.h                       |    1 +
- old-time/System/Time.hsc                           |    8 ++--
- old-time/cbits/timeUtils.c                         |   20 +++++++++++
+ old-time/System/Time.hsc                           |    8 ++---
+ old-time/cbits/timeUtils.c                         |   20 ++++++++++++
  old-time/include/HsTime.h                          |    5 +++
- time/Data/Time/Clock/CTimeval.hs                   |   34 +++++++++++++++----
+ time/Data/Time/Clock/CTimeval.hs                   |   34 ++++++++++++++++----
  time/cbits/HsTime.c                                |    5 +++
- time/configure.ac                                  |    4 ++
+ time/configure.ac                                  |    4 +++
  time/include/HsTime.h                              |    1 +
  time/test/Makefile                                 |    2 +-
- unix/System/Posix/Signals.hsc                      |    4 +-
+ unix/System/Posix/Signals.hsc                      |    4 +--
  17 files changed, 150 insertions(+), 20 deletions(-)
 
 diff --git a/base/GHC/Event/KQueue.hsc b/base/GHC/Event/KQueue.hsc
@@ -456,5 +456,5 @@ index 91e642f..a91a379 100644
    c_sigpending :: Ptr CSigset -> IO CInt
  
 -- 
-1.7.8.4
+1.7.10.4
 
