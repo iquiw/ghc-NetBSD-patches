@@ -1,9 +1,32 @@
-Sat Jun 18 15:45:52 JST 2011  Iku Iwasa <iku.iwasa@gmail.com>
-  * FFI wrappers for NetBSD.
-diff -rN -u old-libraries/base/System/CPUTime.hsc new-libraries/base/System/CPUTime.hsc
---- old-libraries/base/System/CPUTime.hsc	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/base/System/CPUTime.hsc	2011-06-18 15:46:20.000000000 +0900
-@@ -115,7 +115,7 @@
+From 6e37f9c8671a6b6862bb76b01eb7254588ec0892 Mon Sep 17 00:00:00 2001
+From: Iku Iwasa <iku.iwasa@gmail.com>
+Date: Sun, 5 Aug 2012 22:13:52 +0900
+Subject: [PATCH] FFI wrappers and type changes for NetBSD.
+
+---
+ base/System/CPUTime.hsc                            |  2 +-
+ base/System/Event/Clock.hsc                        |  2 +-
+ base/System/Event/KQueue.hsc                       | 31 ++++++++++++++++--
+ base/System/Posix/Internals.hs                     |  2 +-
+ base/configure.ac                                  |  9 +++++
+ base/include/EventConfig.h.in                      |  9 +++++
+ base/include/HsBase.h                              | 32 ++++++++++++++++++
+ .../System/Console/Haskeline/Backend/IConv.hsc     |  2 +-
+ haskeline/cbits/h_iconv.c                          |  7 ++++
+ haskeline/includes/h_iconv.h                       |  1 +
+ time/Data/Time/Clock/CTimeval.hs                   | 38 ++++++++++++++++++----
+ time/cbits/HsTime.c                                |  5 +++
+ time/configure.ac                                  |  5 +++
+ time/include/HsTime.h                              |  1 +
+ time/test/Makefile                                 |  2 +-
+ unix/System/Posix/Signals.hsc                      |  4 +--
+ 16 files changed, 135 insertions(+), 17 deletions(-)
+
+diff --git a/base/System/CPUTime.hsc b/base/System/CPUTime.hsc
+index a7bbe20..3d5f287 100644
+--- a/base/System/CPUTime.hsc
++++ b/base/System/CPUTime.hsc
+@@ -115,7 +115,7 @@ getCPUTime = do
                  * 1000000)
  
  type CRUsage = ()
@@ -12,37 +35,34 @@ diff -rN -u old-libraries/base/System/CPUTime.hsc new-libraries/base/System/CPUT
  #else
  # if defined(HAVE_TIMES)
      allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
-diff -rN -u old-libraries/base/System/Event/Clock.hsc new-libraries/base/System/Event/Clock.hsc
---- old-libraries/base/System/Event/Clock.hsc	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/base/System/Event/Clock.hsc	2011-06-18 15:46:20.000000000 +0900
-@@ -48,5 +48,5 @@
+diff --git a/base/System/Event/Clock.hsc b/base/System/Event/Clock.hsc
+index 5db2cae..4638bca 100644
+--- a/base/System/Event/Clock.hsc
++++ b/base/System/Event/Clock.hsc
+@@ -48,5 +48,5 @@ instance Storable CTimeval where
          #{poke struct timeval, tv_sec} ptr (sec tv)
          #{poke struct timeval, tv_usec} ptr (usec tv)
  
 -foreign import ccall unsafe "sys/time.h gettimeofday" gettimeofday
 +foreign import ccall unsafe "__hsbase_gettimeofday" gettimeofday
      :: Ptr CTimeval -> Ptr () -> IO CInt
-diff -rN -u old-libraries/base/System/Event/KQueue.hsc new-libraries/base/System/Event/KQueue.hsc
---- old-libraries/base/System/Event/KQueue.hsc	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/base/System/Event/KQueue.hsc	2011-06-18 15:46:20.000000000 +0900
-@@ -24,7 +24,7 @@
- import Control.Concurrent.MVar (MVar, newMVar, swapMVar, withMVar)
- import Control.Monad (when, unless)
- import Data.Bits (Bits(..))
--import Data.Word (Word16, Word32)
-+import Data.Word (Word16, Word32, Word64)
- import Foreign.C.Error (throwErrnoIfMinus1)
- import Foreign.C.Types (CInt, CLong, CTime)
- import Foreign.Marshal.Alloc (alloca)
-@@ -43,7 +43,6 @@
+diff --git a/base/System/Event/KQueue.hsc b/base/System/Event/KQueue.hsc
+index 945378d..dd6ec1e 100644
+--- a/base/System/Event/KQueue.hsc
++++ b/base/System/Event/KQueue.hsc
+@@ -43,8 +43,10 @@ import qualified System.Event.Array as A
  
  #if defined(HAVE_KEVENT64)
  import Data.Int (Int64)
 -import Data.Word (Word64)
  import Foreign.C.Types (CUInt)
++#elif SIZEOF_KEV_DATA == 8 /* NetBSD uses int64_t for kevent.data */
++import Data.Int (Int64)
++import Foreign.C.Types (CUIntPtr)
  #else
  import Foreign.C.Types (CIntPtr, CUIntPtr)
-@@ -169,7 +168,7 @@
+ #endif
+@@ -169,7 +171,7 @@ data Event = KEvent {
      , filter :: {-# UNPACK #-} !Filter
      , flags  :: {-# UNPACK #-} !Flag
      , fflags :: {-# UNPACK #-} !FFlag
@@ -51,7 +71,7 @@ diff -rN -u old-libraries/base/System/Event/KQueue.hsc new-libraries/base/System
      , udata  :: {-# UNPACK #-} !(Ptr ())
      } deriving Show
  
-@@ -207,7 +206,14 @@
+@@ -207,7 +209,14 @@ newtype FFlag = FFlag Word32
   , noteEOF = NOTE_EOF
   }
  
@@ -66,7 +86,7 @@ diff -rN -u old-libraries/base/System/Event/KQueue.hsc new-libraries/base/System
      deriving (Eq, Show, Storable)
  
  #{enum Flag, Flag
-@@ -215,7 +221,14 @@
+@@ -215,7 +224,14 @@ newtype Flag = Flag Word16
   , flagDelete  = EV_DELETE
   }
  
@@ -81,7 +101,7 @@ diff -rN -u old-libraries/base/System/Event/KQueue.hsc new-libraries/base/System
      deriving (Bits, Eq, Num, Show, Storable)
  
  #{enum Filter, Filter
-@@ -223,6 +236,15 @@
+@@ -223,6 +239,15 @@ newtype Filter = Filter Word16
   , filterWrite  = EVFILT_WRITE
   }
  
@@ -97,7 +117,7 @@ diff -rN -u old-libraries/base/System/Event/KQueue.hsc new-libraries/base/System
  data TimeSpec = TimeSpec {
        tv_sec  :: {-# UNPACK #-} !CTime
      , tv_nsec :: {-# UNPACK #-} !CLong
-@@ -288,7 +310,7 @@
+@@ -288,7 +313,7 @@ foreign import ccall safe "kevent64"
      c_kevent64 :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
                 -> Ptr TimeSpec -> IO CInt
  #elif defined(HAVE_KEVENT)
@@ -106,10 +126,11 @@ diff -rN -u old-libraries/base/System/Event/KQueue.hsc new-libraries/base/System
      c_kevent :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
               -> Ptr TimeSpec -> IO CInt
  #else
-diff -rN -u old-libraries/base/System/Posix/Internals.hs new-libraries/base/System/Posix/Internals.hs
---- old-libraries/base/System/Posix/Internals.hs	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/base/System/Posix/Internals.hs	2011-06-18 15:46:20.000000000 +0900
-@@ -451,7 +451,7 @@
+diff --git a/base/System/Posix/Internals.hs b/base/System/Posix/Internals.hs
+index 941dd5e..b65021c 100644
+--- a/base/System/Posix/Internals.hs
++++ b/base/System/Posix/Internals.hs
+@@ -451,7 +451,7 @@ foreign import ccall unsafe "HsBase.h __hscore_sigemptyset"
  foreign import ccall unsafe "HsBase.h __hscore_sigaddset"
     c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
  
@@ -118,10 +139,11 @@ diff -rN -u old-libraries/base/System/Posix/Internals.hs new-libraries/base/Syst
     c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
  
  foreign import ccall unsafe "HsBase.h tcgetattr"
-diff -rN -u old-libraries/base/configure.ac new-libraries/base/configure.ac
---- old-libraries/base/configure.ac	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/base/configure.ac	2011-06-18 15:46:21.000000000 +0900
-@@ -42,6 +42,15 @@
+diff --git a/base/configure.ac b/base/configure.ac
+index c79c531..467adea 100644
+--- a/base/configure.ac
++++ b/base/configure.ac
+@@ -42,6 +42,15 @@ fi
  
  if test "$ac_cv_header_sys_event_h" = yes -a "$ac_cv_func_kqueue" = yes; then
    AC_DEFINE([HAVE_KQUEUE], [1], [Define if you have kqueue support.])
@@ -137,9 +159,10 @@ diff -rN -u old-libraries/base/configure.ac new-libraries/base/configure.ac
  fi
  
  if test "$ac_cv_header_poll_h" = yes -a "$ac_cv_func_poll" = yes; then
-diff -rN -u old-libraries/base/include/EventConfig.h.in new-libraries/base/include/EventConfig.h.in
---- old-libraries/base/include/EventConfig.h.in	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/base/include/EventConfig.h.in	2011-06-18 15:46:21.000000000 +0900
+diff --git a/base/include/EventConfig.h.in b/base/include/EventConfig.h.in
+index 032ceb1..82f1a96 100644
+--- a/base/include/EventConfig.h.in
++++ b/base/include/EventConfig.h.in
 @@ -83,3 +83,12 @@
  
  /* Define to 1 if you have the ANSI C header files. */
@@ -153,10 +176,11 @@ diff -rN -u old-libraries/base/include/EventConfig.h.in new-libraries/base/inclu
 +
 +/* The size of `kev.data', as computed by sizeof. */
 +#undef SIZEOF_KEV_DATA
-diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBase.h
---- old-libraries/base/include/HsBase.h	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/base/include/HsBase.h	2011-06-18 15:46:21.000000000 +0900
-@@ -145,6 +145,10 @@
+diff --git a/base/include/HsBase.h b/base/include/HsBase.h
+index 9bc5f28..4e2b5bc 100644
+--- a/base/include/HsBase.h
++++ b/base/include/HsBase.h
+@@ -145,6 +145,10 @@ extern HsWord64 getUSecOfDay(void);
  #include <sys/select.h>
  #endif
  
@@ -167,7 +191,7 @@ diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBas
  /* in inputReady.c */
  extern int fdReady(int fd, int write, int msecs, int isSock);
  
-@@ -203,6 +207,18 @@
+@@ -203,6 +207,18 @@ __hscore_sigismember( sigset_t * set, int s )
  { return sigismember(set,s); }
  
  INLINE int
@@ -186,7 +210,7 @@ diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBas
  __hscore_utime( const char *file, const struct utimbuf *timep )
  { return utime(file,timep); }
  #endif
-@@ -614,6 +630,10 @@
+@@ -614,6 +630,10 @@ INLINE off_t __hscore_lseek(int fd, off_t off, int whence) {
  }
  #endif
  
@@ -197,7 +221,7 @@ diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBas
  // select-related stuff
  
  #if !defined(__MINGW32__)
-@@ -629,6 +649,18 @@
+@@ -629,6 +649,18 @@ INLINE int __hscore_select(int nfds, fd_set *readfds, fd_set *writefds,
  	return (select(nfds,readfds,writefds,exceptfds,timeout));
  }
  
@@ -216,10 +240,11 @@ diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBas
  // gettimeofday()-related
  
  #if !defined(__MINGW32__)
-diff -rN -u old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc
---- old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-06-18 15:46:21.000000000 +0900
-@@ -62,7 +62,7 @@
+diff --git a/haskeline/System/Console/Haskeline/Backend/IConv.hsc b/haskeline/System/Console/Haskeline/Backend/IConv.hsc
+index 5544143..872b6ea 100644
+--- a/haskeline/System/Console/Haskeline/Backend/IConv.hsc
++++ b/haskeline/System/Console/Haskeline/Backend/IConv.hsc
+@@ -62,7 +62,7 @@ openPartialDecoder codeset = do
  ---------------------
  -- Setting the locale
  
@@ -228,10 +253,19 @@ diff -rN -u old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc n
  
  setLocale :: Maybe String -> IO (Maybe String)
  setLocale oldLocale = (maybeWith withCString) oldLocale $ \loc_p -> do
-diff -rN -u old-libraries/haskeline/cbits/h_iconv.c new-libraries/haskeline/cbits/h_iconv.c
---- old-libraries/haskeline/cbits/h_iconv.c	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/haskeline/cbits/h_iconv.c	2011-06-18 15:46:21.000000000 +0900
-@@ -16,3 +16,8 @@
+diff --git a/haskeline/cbits/h_iconv.c b/haskeline/cbits/h_iconv.c
+index 71234c8..6f3b9f3 100644
+--- a/haskeline/cbits/h_iconv.c
++++ b/haskeline/cbits/h_iconv.c
+@@ -1,5 +1,7 @@
+ #include "h_iconv.h"
+ 
++#include <locale.h>
++
+ // Wrapper functions, since iconv_open et al are macros in libiconv.
+ iconv_t h_iconv_open(const char *tocode, const char *fromcode) {
+     return iconv_open(tocode, fromcode);
+@@ -16,3 +18,8 @@ size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
      // a (char **).
      return iconv(cd, (void*)inbuf, inbytesleft, outbuf, outbytesleft);
  }
@@ -240,18 +274,20 @@ diff -rN -u old-libraries/haskeline/cbits/h_iconv.c new-libraries/haskeline/cbit
 +{
 +    return setlocale(category, locale);
 +}
-diff -rN -u old-libraries/haskeline/includes/h_iconv.h new-libraries/haskeline/includes/h_iconv.h
---- old-libraries/haskeline/includes/h_iconv.h	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/haskeline/includes/h_iconv.h	2011-06-18 15:46:21.000000000 +0900
-@@ -7,3 +7,4 @@
+diff --git a/haskeline/includes/h_iconv.h b/haskeline/includes/h_iconv.h
+index 9022381..32a7cfb 100644
+--- a/haskeline/includes/h_iconv.h
++++ b/haskeline/includes/h_iconv.h
+@@ -7,3 +7,4 @@ void h_iconv_close(iconv_t cd);
  size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
                  char **outbuf, size_t *outbytesleft);
  
 +char *h_setlocale(int category, const char *locale);
-diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Data/Time/Clock/CTimeval.hs
---- old-libraries/time/Data/Time/Clock/CTimeval.hs	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/time/Data/Time/Clock/CTimeval.hs	2011-06-18 15:46:21.000000000 +0900
-@@ -7,20 +7,40 @@
+diff --git a/time/Data/Time/Clock/CTimeval.hs b/time/Data/Time/Clock/CTimeval.hs
+index 5e0ffdf..b55eb56 100644
+--- a/time/Data/Time/Clock/CTimeval.hs
++++ b/time/Data/Time/Clock/CTimeval.hs
+@@ -7,20 +7,44 @@ module Data.Time.Clock.CTimeval where
  import Foreign
  import Foreign.C
  
@@ -259,7 +295,7 @@ diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Da
 +#include "HsTimeConfig.h"
 +
 +--
-+-- we assume time_t and suseconds_t are either long long or long.
++-- we assume time_t and suseconds_t are either long long, long or int.
 +--
 +#ifndef SIZEOF_TIME_T
 +#error "SIZEOF_TIME_T is not defined, run autoreconf!"
@@ -268,12 +304,16 @@ diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Da
 +type TimeT = CLLong
 +#elif SIZEOF_TIME_T == SIZEOF_LONG
 +type TimeT = CLong
++#elif SIZEOF_TIME_T == SIZEOF_INT
++type TimeT = CInt
 +#endif
 +
 +#if SIZEOF_SUSECONDS_T == SIZEOF_LONG_LONG
 +type SusecondsT = CLLong
 +#elif SIZEOF_SUSECONDS_T == SIZEOF_LONG
 +type SusecondsT = CLong
++#elif SIZEOF_SUSECONDS_T == SIZEOF_INT
++type SusecondsT = CInt
 +#endif
 +
 +data CTimeval = MkCTimeval TimeT SusecondsT
@@ -299,10 +339,11 @@ diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Da
  
  -- | Get the current POSIX time from the system clock.
  getCTimeval :: IO CTimeval
-diff -rN -u old-libraries/time/cbits/HsTime.c new-libraries/time/cbits/HsTime.c
---- old-libraries/time/cbits/HsTime.c	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/time/cbits/HsTime.c	2011-06-18 15:46:21.000000000 +0900
-@@ -38,3 +38,8 @@
+diff --git a/time/cbits/HsTime.c b/time/cbits/HsTime.c
+index dacb1d4..3f835f2 100644
+--- a/time/cbits/HsTime.c
++++ b/time/cbits/HsTime.c
+@@ -38,3 +38,8 @@ long int get_current_timezone_seconds (time_t t,int* pdst,char const* * pname)
  	}
  	else return 0x80000000;
  }
@@ -311,23 +352,26 @@ diff -rN -u old-libraries/time/cbits/HsTime.c new-libraries/time/cbits/HsTime.c
 +{
 +	return gettimeofday(tv, tz);
 +}
-diff -rN -u old-libraries/time/configure.ac new-libraries/time/configure.ac
---- old-libraries/time/configure.ac	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/time/configure.ac	2011-06-18 15:46:21.000000000 +0900
-@@ -12,6 +12,10 @@
+diff --git a/time/configure.ac b/time/configure.ac
+index b04e8cd..c965bf2 100644
+--- a/time/configure.ac
++++ b/time/configure.ac
+@@ -12,6 +12,11 @@ AC_CONFIG_HEADERS([include/HsTimeConfig.h])
  
  AC_CHECK_HEADERS([time.h])
  AC_CHECK_FUNCS([gmtime_r localtime_r])
 +AC_CHECK_SIZEOF([time_t])
 +AC_CHECK_SIZEOF([suseconds_t])
++AC_CHECK_SIZEOF([int])
 +AC_CHECK_SIZEOF([long])
 +AC_CHECK_SIZEOF([long long])
  
  AC_STRUCT_TM
  AC_STRUCT_TIMEZONE
-diff -rN -u old-libraries/time/include/HsTime.h new-libraries/time/include/HsTime.h
---- old-libraries/time/include/HsTime.h	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/time/include/HsTime.h	2011-06-18 15:46:21.000000000 +0900
+diff --git a/time/include/HsTime.h b/time/include/HsTime.h
+index 5296437..dfe05fe 100644
+--- a/time/include/HsTime.h
++++ b/time/include/HsTime.h
 @@ -19,5 +19,6 @@
  #endif
  
@@ -335,10 +379,11 @@ diff -rN -u old-libraries/time/include/HsTime.h new-libraries/time/include/HsTim
 +int __hstime_gettimeofday(struct timeval*, void*);
  
  #endif
-diff -rN -u old-libraries/time/test/Makefile new-libraries/time/test/Makefile
---- old-libraries/time/test/Makefile	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/time/test/Makefile	2011-06-18 15:46:21.000000000 +0900
-@@ -2,7 +2,7 @@
+diff --git a/time/test/Makefile b/time/test/Makefile
+index 307adcc..1758dca 100644
+--- a/time/test/Makefile
++++ b/time/test/Makefile
+@@ -2,7 +2,7 @@ GHC = ghc
  GHCFLAGS = -package time
  
  default:
@@ -347,10 +392,11 @@ diff -rN -u old-libraries/time/test/Makefile new-libraries/time/test/Makefile
  
  TestMonthDay: TestMonthDay.o
  	$(GHC) $(GHCFLAGS) $^ -o $@
-diff -rN -u old-libraries/unix/System/Posix/Signals.hsc new-libraries/unix/System/Posix/Signals.hsc
---- old-libraries/unix/System/Posix/Signals.hsc	2011-06-18 15:46:20.000000000 +0900
-+++ new-libraries/unix/System/Posix/Signals.hsc	2011-06-18 15:46:21.000000000 +0900
-@@ -595,7 +595,7 @@
+diff --git a/unix/System/Posix/Signals.hsc b/unix/System/Posix/Signals.hsc
+index b6d256f..3ec9f81 100644
+--- a/unix/System/Posix/Signals.hsc
++++ b/unix/System/Posix/Signals.hsc
+@@ -595,7 +595,7 @@ awaitSignal maybe_sigset = do
    -- XXX My manpage says it can also return EFAULT. And why is ignoring
    -- EINTR the right thing to do?
   
@@ -359,7 +405,7 @@ diff -rN -u old-libraries/unix/System/Posix/Signals.hsc new-libraries/unix/Syste
    c_sigsuspend :: Ptr CSigset -> IO CInt
  #endif
  
-@@ -619,6 +619,6 @@
+@@ -619,6 +619,6 @@ foreign import ccall unsafe "__hscore_sigismember"
    c_sigismember :: Ptr CSigset -> CInt -> IO CInt
  #endif /* __HUGS__ */
  
@@ -367,3 +413,6 @@ diff -rN -u old-libraries/unix/System/Posix/Signals.hsc new-libraries/unix/Syste
 +foreign import ccall unsafe "__hscore_sigpending"
    c_sigpending :: Ptr CSigset -> IO CInt
  
+-- 
+1.7.11.3
+

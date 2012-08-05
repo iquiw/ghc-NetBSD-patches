@@ -1,50 +1,42 @@
-From 0a3359cc67d66eebcab21c343f454508a5109764 Mon Sep 17 00:00:00 2001
+From e83b127305b3b6bce9a673c26b5994397a66c101 Mon Sep 17 00:00:00 2001
 From: Iku Iwasa <iku.iwasa@gmail.com>
-Date: Sat, 16 Jun 2012 17:41:41 +0900
+Date: Sun, 5 Aug 2012 14:49:39 +0900
 Subject: [PATCH] FFI wrappers and type changes for NetBSD.
 
 ---
- base/GHC/Event/KQueue.hsc                          |   30 ++++++++++++++---
- base/System/Posix/Internals.hs                     |    2 +-
- base/configure.ac                                  |    9 ++++++
- base/include/EventConfig.h.in                      |    9 ++++++
- base/include/HsBase.h                              |   29 +++++++++++++++++
- .../System/Console/Haskeline/Backend/IConv.hsc     |    2 +-
- haskeline/cbits/h_iconv.c                          |    5 +++
- haskeline/includes/h_iconv.h                       |    1 +
- old-time/System/Time.hsc                           |    8 ++---
- old-time/cbits/timeUtils.c                         |   20 ++++++++++++
- old-time/include/HsTime.h                          |    5 +++
- time/Data/Time/Clock/CTimeval.hs                   |   34 ++++++++++++++++----
- time/cbits/HsTime.c                                |    5 +++
- time/configure.ac                                  |    4 +++
- time/include/HsTime.h                              |    1 +
- time/test/Makefile                                 |    2 +-
- unix/System/Posix/Signals.hsc                      |    4 +--
- 17 files changed, 150 insertions(+), 20 deletions(-)
+ base/GHC/Event/KQueue.hsc                          | 29 +++++++++++++++--
+ base/System/Posix/Internals.hs                     |  2 +-
+ base/configure.ac                                  |  9 +++++
+ base/include/EventConfig.h.in                      |  9 +++++
+ base/include/HsBase.h                              | 29 +++++++++++++++++
+ .../System/Console/Haskeline/Backend/IConv.hsc     |  2 +-
+ haskeline/cbits/h_iconv.c                          |  7 ++++
+ haskeline/includes/h_iconv.h                       |  1 +
+ old-time/System/Time.hsc                           |  8 ++---
+ old-time/cbits/timeUtils.c                         | 20 ++++++++++++
+ old-time/include/HsTime.h                          |  5 +++
+ time/Data/Time/Clock/CTimeval.hs                   | 38 ++++++++++++++++++----
+ time/cbits/HsTime.c                                |  5 +++
+ time/configure.ac                                  |  5 +++
+ time/include/HsTime.h                              |  1 +
+ time/test/Makefile                                 |  2 +-
+ unix/System/Posix/Signals.hsc                      |  4 +--
+ 17 files changed, 158 insertions(+), 18 deletions(-)
 
 diff --git a/base/GHC/Event/KQueue.hsc b/base/GHC/Event/KQueue.hsc
-index 68aade3..e4c33d7 100644
+index 68aade3..c769c27 100644
 --- a/base/GHC/Event/KQueue.hsc
 +++ b/base/GHC/Event/KQueue.hsc
-@@ -30,7 +30,7 @@ available = False
- import Control.Concurrent.MVar (MVar, newMVar, swapMVar, withMVar)
- import Control.Monad (when, unless)
- import Data.Bits (Bits(..))
--import Data.Word (Word16, Word32)
-+import Data.Word (Word16, Word32, Word64)
- import Foreign.C.Error (throwErrnoIfMinus1)
- import Foreign.C.Types
- import Foreign.Marshal.Alloc (alloca)
-@@ -49,7 +49,6 @@ import qualified GHC.Event.Array as A
- 
+@@ -50,6 +50,8 @@ import qualified GHC.Event.Array as A
  #if defined(HAVE_KEVENT64)
  import Data.Int (Int64)
--import Data.Word (Word64)
+ import Data.Word (Word64)
++#elif SIZEOF_KEV_DATA == 8 /* NetBSD uses int64_t for kevent.data */
++import Data.Int (Int64)
  #endif
  
  #include <sys/types.h>
-@@ -172,7 +171,7 @@ data Event = KEvent {
+@@ -172,7 +174,7 @@ data Event = KEvent {
      , filter :: {-# UNPACK #-} !Filter
      , flags  :: {-# UNPACK #-} !Flag
      , fflags :: {-# UNPACK #-} !FFlag
@@ -53,7 +45,7 @@ index 68aade3..e4c33d7 100644
      , udata  :: {-# UNPACK #-} !(Ptr ())
      } deriving Show
  
-@@ -210,7 +209,14 @@ newtype FFlag = FFlag Word32
+@@ -210,7 +212,14 @@ newtype FFlag = FFlag Word32
   , noteEOF = NOTE_EOF
   }
  
@@ -68,7 +60,7 @@ index 68aade3..e4c33d7 100644
      deriving (Eq, Show, Storable)
  
  #{enum Flag, Flag
-@@ -218,7 +224,14 @@ newtype Flag = Flag Word16
+@@ -218,7 +227,14 @@ newtype Flag = Flag Word16
   , flagDelete  = EV_DELETE
   }
  
@@ -83,7 +75,7 @@ index 68aade3..e4c33d7 100644
      deriving (Bits, Eq, Num, Show, Storable)
  
  #{enum Filter, Filter
-@@ -226,6 +239,15 @@ newtype Filter = Filter Word16
+@@ -226,6 +242,15 @@ newtype Filter = Filter Word16
   , filterWrite  = EVFILT_WRITE
   }
  
@@ -91,7 +83,7 @@ index 68aade3..e4c33d7 100644
 +#error "SIZEOF_KEV_DATA is not defined, run autoreconf!"
 +#endif
 +#if SIZEOF_KEV_DATA == 8 /* NetBSD uses int64_t for kevent.data */
-+type FData = Word64
++type FData = Int64
 +#else /* assume intptr */
 +type FData = CIntPtr
 +#endif
@@ -99,7 +91,7 @@ index 68aade3..e4c33d7 100644
  data TimeSpec = TimeSpec {
        tv_sec  :: {-# UNPACK #-} !CTime
      , tv_nsec :: {-# UNPACK #-} !CLong
-@@ -291,7 +313,7 @@ foreign import ccall safe "kevent64"
+@@ -291,7 +316,7 @@ foreign import ccall safe "kevent64"
      c_kevent64 :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
                 -> Ptr TimeSpec -> IO CInt
  #elif defined(HAVE_KEVENT)
@@ -233,10 +225,18 @@ index a217ac4..dd911ba 100644
  setLocale :: Maybe String -> IO (Maybe String)
  setLocale oldLocale = (maybeWith withCAString) oldLocale $ \loc_p -> do
 diff --git a/haskeline/cbits/h_iconv.c b/haskeline/cbits/h_iconv.c
-index 71234c8..7127a4c 100644
+index 71234c8..6f3b9f3 100644
 --- a/haskeline/cbits/h_iconv.c
 +++ b/haskeline/cbits/h_iconv.c
-@@ -16,3 +16,8 @@ size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
+@@ -1,5 +1,7 @@
+ #include "h_iconv.h"
+ 
++#include <locale.h>
++
+ // Wrapper functions, since iconv_open et al are macros in libiconv.
+ iconv_t h_iconv_open(const char *tocode, const char *fromcode) {
+     return iconv_open(tocode, fromcode);
+@@ -16,3 +18,8 @@ size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
      // a (char **).
      return iconv(cd, (void*)inbuf, inbytesleft, outbuf, outbytesleft);
  }
@@ -331,10 +331,10 @@ index 544cd02..69a1239 100644
 +
  #endif /* __TIMEUTILS_H__ */
 diff --git a/time/Data/Time/Clock/CTimeval.hs b/time/Data/Time/Clock/CTimeval.hs
-index 5e0ffdf..5ce3c11 100644
+index 5e0ffdf..b55eb56 100644
 --- a/time/Data/Time/Clock/CTimeval.hs
 +++ b/time/Data/Time/Clock/CTimeval.hs
-@@ -7,20 +7,40 @@ module Data.Time.Clock.CTimeval where
+@@ -7,20 +7,44 @@ module Data.Time.Clock.CTimeval where
  import Foreign
  import Foreign.C
  
@@ -342,7 +342,7 @@ index 5e0ffdf..5ce3c11 100644
 +#include "HsTimeConfig.h"
 +
 +--
-+-- we assume time_t and suseconds_t are either long long or long.
++-- we assume time_t and suseconds_t are either long long, long or int.
 +--
 +#ifndef SIZEOF_TIME_T
 +#error "SIZEOF_TIME_T is not defined, run autoreconf!"
@@ -351,12 +351,16 @@ index 5e0ffdf..5ce3c11 100644
 +type TimeT = CLLong
 +#elif SIZEOF_TIME_T == SIZEOF_LONG
 +type TimeT = CLong
++#elif SIZEOF_TIME_T == SIZEOF_INT
++type TimeT = CInt
 +#endif
 +
 +#if SIZEOF_SUSECONDS_T == SIZEOF_LONG_LONG
 +type SusecondsT = CLLong
 +#elif SIZEOF_SUSECONDS_T == SIZEOF_LONG
 +type SusecondsT = CLong
++#elif SIZEOF_SUSECONDS_T == SIZEOF_INT
++type SusecondsT = CInt
 +#endif
 +
 +data CTimeval = MkCTimeval TimeT SusecondsT
@@ -396,15 +400,16 @@ index dacb1d4..3f835f2 100644
 +	return gettimeofday(tv, tz);
 +}
 diff --git a/time/configure.ac b/time/configure.ac
-index dc58c49..050fdf6 100644
+index dc58c49..cb5cb96 100644
 --- a/time/configure.ac
 +++ b/time/configure.ac
-@@ -12,6 +12,10 @@ AC_CONFIG_HEADERS([include/HsTimeConfig.h])
+@@ -12,6 +12,11 @@ AC_CONFIG_HEADERS([include/HsTimeConfig.h])
  
  AC_CHECK_HEADERS([time.h])
  AC_CHECK_FUNCS([gmtime_r localtime_r])
 +AC_CHECK_SIZEOF([time_t])
 +AC_CHECK_SIZEOF([suseconds_t])
++AC_CHECK_SIZEOF([int])
 +AC_CHECK_SIZEOF([long])
 +AC_CHECK_SIZEOF([long long])
  
@@ -456,5 +461,5 @@ index 91e642f..a91a379 100644
    c_sigpending :: Ptr CSigset -> IO CInt
  
 -- 
-1.7.10.4
+1.7.11.3
 

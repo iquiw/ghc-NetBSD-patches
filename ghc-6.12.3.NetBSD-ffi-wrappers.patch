@@ -1,9 +1,27 @@
-Fri Apr 29 11:42:15 JST 2011  Iku Iwasa <iku.iwasa@gmail.com>
-  * FFI wrappers for NetBSD.
-diff -rN -u old-libraries/base/System/CPUTime.hsc new-libraries/base/System/CPUTime.hsc
---- old-libraries/base/System/CPUTime.hsc	2011-04-29 11:43:28.000000000 +0900
-+++ new-libraries/base/System/CPUTime.hsc	2011-04-29 11:43:28.000000000 +0900
-@@ -104,7 +104,7 @@
+From 6bb40d708851780341ddc7e830e8503b481b890a Mon Sep 17 00:00:00 2001
+From: Iku Iwasa <iku.iwasa@gmail.com>
+Date: Sun, 5 Aug 2012 21:56:11 +0900
+Subject: [PATCH] FFI wrappers and type changes for NetBSD.
+
+---
+ base/System/CPUTime.hsc                            |  2 +-
+ base/System/Posix/Internals.hs                     |  2 +-
+ base/include/HsBase.h                              | 17 ++++++++++
+ .../System/Console/Haskeline/Backend/IConv.hsc     |  2 +-
+ haskeline/cbits/h_iconv.c                          |  5 +++
+ haskeline/includes/h_iconv.h                       |  1 +
+ time/Data/Time/Clock/CTimeval.hs                   | 38 ++++++++++++++++++----
+ time/cbits/HsTime.c                                |  5 +++
+ time/configure.ac                                  |  5 +++
+ time/include/HsTime.h                              |  2 ++
+ unix/System/Posix/Signals.hsc                      |  4 +--
+ 11 files changed, 71 insertions(+), 12 deletions(-)
+
+diff --git a/base/System/CPUTime.hsc b/base/System/CPUTime.hsc
+index c2faa1c..98491e8 100644
+--- a/base/System/CPUTime.hsc
++++ b/base/System/CPUTime.hsc
+@@ -104,7 +104,7 @@ getCPUTime = do
                  * 1000000)
  
  type CRUsage = ()
@@ -12,10 +30,11 @@ diff -rN -u old-libraries/base/System/CPUTime.hsc new-libraries/base/System/CPUT
  #else
  # if defined(HAVE_TIMES)
      allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
-diff -rN -u old-libraries/base/System/Posix/Internals.hs new-libraries/base/System/Posix/Internals.hs
---- old-libraries/base/System/Posix/Internals.hs	2011-04-29 11:43:28.000000000 +0900
-+++ new-libraries/base/System/Posix/Internals.hs	2011-04-29 11:43:28.000000000 +0900
-@@ -448,7 +448,7 @@
+diff --git a/base/System/Posix/Internals.hs b/base/System/Posix/Internals.hs
+index f296a63..7b8053f 100644
+--- a/base/System/Posix/Internals.hs
++++ b/base/System/Posix/Internals.hs
+@@ -448,7 +448,7 @@ foreign import ccall unsafe "HsBase.h __hscore_sigemptyset"
  foreign import ccall unsafe "HsBase.h __hscore_sigaddset"
     c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
  
@@ -24,10 +43,11 @@ diff -rN -u old-libraries/base/System/Posix/Internals.hs new-libraries/base/Syst
     c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
  
  foreign import ccall unsafe "HsBase.h tcgetattr"
-diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBase.h
---- old-libraries/base/include/HsBase.h	2011-04-29 11:43:28.000000000 +0900
-+++ new-libraries/base/include/HsBase.h	2011-04-29 11:43:28.000000000 +0900
-@@ -203,6 +203,19 @@
+diff --git a/base/include/HsBase.h b/base/include/HsBase.h
+index 9bc5f28..8c14166 100644
+--- a/base/include/HsBase.h
++++ b/base/include/HsBase.h
+@@ -203,6 +203,19 @@ __hscore_sigismember( sigset_t * set, int s )
  { return sigismember(set,s); }
  
  INLINE int
@@ -47,7 +67,7 @@ diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBas
  __hscore_utime( const char *file, const struct utimbuf *timep )
  { return utime(file,timep); }
  #endif
-@@ -614,6 +627,10 @@
+@@ -614,6 +627,10 @@ INLINE off_t __hscore_lseek(int fd, off_t off, int whence) {
  }
  #endif
  
@@ -58,10 +78,11 @@ diff -rN -u old-libraries/base/include/HsBase.h new-libraries/base/include/HsBas
  // select-related stuff
  
  #if !defined(__MINGW32__)
-diff -rN -u old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc
---- old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-04-29 11:43:28.000000000 +0900
-+++ new-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc	2011-04-29 11:43:29.000000000 +0900
-@@ -62,7 +62,7 @@
+diff --git a/haskeline/System/Console/Haskeline/Backend/IConv.hsc b/haskeline/System/Console/Haskeline/Backend/IConv.hsc
+index 5544143..872b6ea 100644
+--- a/haskeline/System/Console/Haskeline/Backend/IConv.hsc
++++ b/haskeline/System/Console/Haskeline/Backend/IConv.hsc
+@@ -62,7 +62,7 @@ openPartialDecoder codeset = do
  ---------------------
  -- Setting the locale
  
@@ -70,10 +91,11 @@ diff -rN -u old-libraries/haskeline/System/Console/Haskeline/Backend/IConv.hsc n
  
  setLocale :: Maybe String -> IO (Maybe String)
  setLocale oldLocale = (maybeWith withCString) oldLocale $ \loc_p -> do
-diff -rN -u old-libraries/haskeline/cbits/h_iconv.c new-libraries/haskeline/cbits/h_iconv.c
---- old-libraries/haskeline/cbits/h_iconv.c	2011-04-29 11:43:28.000000000 +0900
-+++ new-libraries/haskeline/cbits/h_iconv.c	2011-04-29 11:43:29.000000000 +0900
-@@ -13,3 +13,8 @@
+diff --git a/haskeline/cbits/h_iconv.c b/haskeline/cbits/h_iconv.c
+index aa8674d..a5981a6 100644
+--- a/haskeline/cbits/h_iconv.c
++++ b/haskeline/cbits/h_iconv.c
+@@ -13,3 +13,8 @@ size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
                  char **outbuf, size_t *outbytesleft) {
      return iconv(cd, inbuf, inbytesleft, outbuf, outbytesleft);
  }
@@ -82,27 +104,28 @@ diff -rN -u old-libraries/haskeline/cbits/h_iconv.c new-libraries/haskeline/cbit
 +{
 +    return setlocale(category, locale);
 +}
-diff -rN -u old-libraries/haskeline/includes/h_iconv.h new-libraries/haskeline/includes/h_iconv.h
---- old-libraries/haskeline/includes/h_iconv.h	2011-04-29 11:43:28.000000000 +0900
-+++ new-libraries/haskeline/includes/h_iconv.h	2011-04-29 11:43:29.000000000 +0900
-@@ -7,3 +7,4 @@
+diff --git a/haskeline/includes/h_iconv.h b/haskeline/includes/h_iconv.h
+index 9022381..32a7cfb 100644
+--- a/haskeline/includes/h_iconv.h
++++ b/haskeline/includes/h_iconv.h
+@@ -7,3 +7,4 @@ void h_iconv_close(iconv_t cd);
  size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
                  char **outbuf, size_t *outbytesleft);
  
 +char *h_setlocale(int category, const char *locale);
-diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Data/Time/Clock/CTimeval.hs
---- old-libraries/time/Data/Time/Clock/CTimeval.hs	2011-04-29 11:43:28.000000000 +0900
-+++ new-libraries/time/Data/Time/Clock/CTimeval.hs	2011-04-29 11:43:29.000000000 +0900
-@@ -7,20 +7,42 @@
+diff --git a/time/Data/Time/Clock/CTimeval.hs b/time/Data/Time/Clock/CTimeval.hs
+index 5e0ffdf..b55eb56 100644
+--- a/time/Data/Time/Clock/CTimeval.hs
++++ b/time/Data/Time/Clock/CTimeval.hs
+@@ -7,20 +7,44 @@ module Data.Time.Clock.CTimeval where
  import Foreign
  import Foreign.C
  
 -data CTimeval = MkCTimeval CLong CLong
 +#include "HsTimeConfig.h"
 +
-+
 +--
-+-- we assume time_t and suseconds_t are either long long or long.
++-- we assume time_t and suseconds_t are either long long, long or int.
 +--
 +#ifndef SIZEOF_TIME_T
 +#error "SIZEOF_TIME_T is not defined, run autoreconf!"
@@ -111,46 +134,46 @@ diff -rN -u old-libraries/time/Data/Time/Clock/CTimeval.hs new-libraries/time/Da
 +type TimeT = CLLong
 +#elif SIZEOF_TIME_T == SIZEOF_LONG
 +type TimeT = CLong
++#elif SIZEOF_TIME_T == SIZEOF_INT
++type TimeT = CInt
 +#endif
 +
 +#if SIZEOF_SUSECONDS_T == SIZEOF_LONG_LONG
 +type SusecondsT = CLLong
 +#elif SIZEOF_SUSECONDS_T == SIZEOF_LONG
 +type SusecondsT = CLong
++#elif SIZEOF_SUSECONDS_T == SIZEOF_INT
++type SusecondsT = CInt
 +#endif
 +
 +data CTimeval = MkCTimeval TimeT SusecondsT
-+
  
  instance Storable CTimeval where
 -	sizeOf _ = (sizeOf (undefined :: CLong)) * 2
--	alignment _ = alignment (undefined :: CLong)
--	peek p = do
++	sizeOf _ = sizeOf (undefined :: TimeT) + sizeOf (undefined :: SusecondsT)
+ 	alignment _ = alignment (undefined :: CLong)
+ 	peek p = do
 -		s   <- peekElemOff (castPtr p) 0
 -		mus <- peekElemOff (castPtr p) 1
--		return (MkCTimeval s mus)
--	poke p (MkCTimeval s mus) = do
++		s   <- peekByteOff p 0
++		mus <- peekByteOff p (sizeOf (undefined :: TimeT))
+ 		return (MkCTimeval s mus)
+ 	poke p (MkCTimeval s mus) = do
 -		pokeElemOff (castPtr p) 0 s
 -		pokeElemOff (castPtr p) 1 mus
-+    sizeOf _ = sizeOf (undefined :: TimeT) + sizeOf (undefined :: SusecondsT)
-+    alignment _ = alignment (undefined :: CLong)
-+    peek p = do
-+        s   <- peekByteOff p 0
-+        mus <- peekByteOff p (sizeOf (undefined :: TimeT))
-+        return (MkCTimeval s mus)
-+    poke p (MkCTimeval s mus) = do
-+        pokeByteOff p 0 s
-+        pokeByteOff p (sizeOf (undefined :: TimeT)) mus
++		pokeByteOff p 0 s
++		pokeByteOff p (sizeOf (undefined :: TimeT)) mus
  
 -foreign import ccall unsafe "time.h gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
 +foreign import ccall unsafe "HsTime.h __hstime_gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
  
  -- | Get the current POSIX time from the system clock.
  getCTimeval :: IO CTimeval
-diff -rN -u old-libraries/time/cbits/HsTime.c new-libraries/time/cbits/HsTime.c
---- old-libraries/time/cbits/HsTime.c	2011-04-29 11:43:28.000000000 +0900
-+++ new-libraries/time/cbits/HsTime.c	2011-04-29 11:43:29.000000000 +0900
-@@ -38,3 +38,8 @@
+diff --git a/time/cbits/HsTime.c b/time/cbits/HsTime.c
+index dacb1d4..102902b 100644
+--- a/time/cbits/HsTime.c
++++ b/time/cbits/HsTime.c
+@@ -38,3 +38,8 @@ long int get_current_timezone_seconds (time_t t,int* pdst,char const* * pname)
  	}
  	else return 0x80000000;
  }
@@ -159,23 +182,26 @@ diff -rN -u old-libraries/time/cbits/HsTime.c new-libraries/time/cbits/HsTime.c
 +{
 +	return gettimeofday(tp, tzp);
 +}
-diff -rN -u old-libraries/time/configure.ac new-libraries/time/configure.ac
---- old-libraries/time/configure.ac	2011-04-29 11:43:28.000000000 +0900
-+++ new-libraries/time/configure.ac	2011-04-29 11:43:29.000000000 +0900
-@@ -12,6 +12,10 @@
+diff --git a/time/configure.ac b/time/configure.ac
+index 885bb01..90ae57c 100644
+--- a/time/configure.ac
++++ b/time/configure.ac
+@@ -12,6 +12,11 @@ AC_CONFIG_HEADERS([include/HsTimeConfig.h])
  
  AC_CHECK_HEADERS([time.h])
  AC_CHECK_FUNCS([gmtime_r localtime_r])
 +AC_CHECK_SIZEOF([time_t])
 +AC_CHECK_SIZEOF([suseconds_t])
++AC_CHECK_SIZEOF([int])
 +AC_CHECK_SIZEOF([long])
 +AC_CHECK_SIZEOF([long long])
  
  AC_STRUCT_TM
  AC_STRUCT_TIMEZONE
-diff -rN -u old-libraries/time/include/HsTime.h new-libraries/time/include/HsTime.h
---- old-libraries/time/include/HsTime.h	2011-04-29 11:43:28.000000000 +0900
-+++ new-libraries/time/include/HsTime.h	2011-04-29 11:43:29.000000000 +0900
+diff --git a/time/include/HsTime.h b/time/include/HsTime.h
+index 5296437..531483d 100644
+--- a/time/include/HsTime.h
++++ b/time/include/HsTime.h
 @@ -20,4 +20,6 @@
  
  long int get_current_timezone_seconds (time_t,int* pdst,char const* * pname);
@@ -183,10 +209,11 @@ diff -rN -u old-libraries/time/include/HsTime.h new-libraries/time/include/HsTim
 +int __hstime_gettimeofday(struct timeval *tp, void *tzp);
 +
  #endif
-diff -rN -u old-libraries/unix/System/Posix/Signals.hsc new-libraries/unix/System/Posix/Signals.hsc
---- old-libraries/unix/System/Posix/Signals.hsc	2011-04-29 11:43:28.000000000 +0900
-+++ new-libraries/unix/System/Posix/Signals.hsc	2011-04-29 11:43:29.000000000 +0900
-@@ -581,7 +581,7 @@
+diff --git a/unix/System/Posix/Signals.hsc b/unix/System/Posix/Signals.hsc
+index 454b0dd..98544de 100644
+--- a/unix/System/Posix/Signals.hsc
++++ b/unix/System/Posix/Signals.hsc
+@@ -581,7 +581,7 @@ awaitSignal maybe_sigset = do
    -- XXX My manpage says it can also return EFAULT. And why is ignoring
    -- EINTR the right thing to do?
   
@@ -195,7 +222,7 @@ diff -rN -u old-libraries/unix/System/Posix/Signals.hsc new-libraries/unix/Syste
    c_sigsuspend :: Ptr CSigset -> IO CInt
  #endif
  
-@@ -605,6 +605,6 @@
+@@ -605,6 +605,6 @@ foreign import ccall unsafe "__hscore_sigismember"
    c_sigismember :: Ptr CSigset -> CInt -> IO CInt
  #endif /* __HUGS__ */
  
@@ -203,3 +230,6 @@ diff -rN -u old-libraries/unix/System/Posix/Signals.hsc new-libraries/unix/Syste
 +foreign import ccall unsafe "__hscore_sigpending"
    c_sigpending :: Ptr CSigset -> IO CInt
  
+-- 
+1.7.11.3
+
