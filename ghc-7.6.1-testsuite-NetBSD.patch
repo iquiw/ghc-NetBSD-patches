@@ -1,0 +1,40 @@
+From 7da11a22e28f46fe0abddd30f1afc9223131cfaf Mon Sep 17 00:00:00 2001
+From: Iku Iwasa <iku.iwasa@gmail.com>
+Date: Sun, 9 Sep 2012 12:01:58 +0900
+Subject: [PATCH] Adapt for NetBSD.
+
+---
+ tests/ghci/scripts/T6106_preproc.sh | 2 +-
+ tests/plugins/Makefile              | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/tests/ghci/scripts/T6106_preproc.sh b/tests/ghci/scripts/T6106_preproc.sh
+index f9ac397..56ca608 100755
+--- a/tests/ghci/scripts/T6106_preproc.sh
++++ b/tests/ghci/scripts/T6106_preproc.sh
+@@ -1,4 +1,4 @@
+-#!/bin/bash
++#!/bin/sh
+ #
+ # file T6106_preproc.sh
+ #
+diff --git a/tests/plugins/Makefile b/tests/plugins/Makefile
+index 79b1217..4e67fe1 100644
+--- a/tests/plugins/Makefile
++++ b/tests/plugins/Makefile
+@@ -11,10 +11,10 @@ plugins01:
+ 	# the output of the call to the TEST_HC (probably just the last 2).
+ 	#
+ 	# Suggestions to make this better gratefully recieved.
+-	(cd simple-plugin; make package)
++	(cd simple-plugin; $(MAKE) package)
+ 	$(RM) plugins01.hi plugins01.o
+ 	"$(TEST_HC)" $(HC_OPTS) --make -v0 plugins01.hs -package-db simple-plugin/local.package.conf -fplugin Simple.Plugin -fplugin-opt Simple.Plugin:Irrelevant_Option -package simple-plugin
+ 	./plugins01
+ 
+ clean:
+-	cd simple-plugin && make clean
++	cd simple-plugin && $(MAKE) clean
+-- 
+1.7.12
+

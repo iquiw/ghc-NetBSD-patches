@@ -25,6 +25,10 @@ in some header file,
 These patches provide FFI wrappers for such functions in C files with
 proper header files included.
 
+In addition, there are some other fixes for NetBSD.
+
+# They should be included in the upstream, but the patch is not yet much clean.
+
 -----------
 How to use?
 -----------
@@ -33,21 +37,24 @@ How to use?
 2. Unpack ghc source tarball and go to libraries directory::
 
     $ tar xzf ghc-x.x.x.tar.gz
-    $ cd ghc-x.x.x/libraries
+    (> 7.6) $ cd ghc-x.x.x
+    (< 7.6) $ cd ghc-x.x.x/libraries
 
 3. Apply the patch::
 
-    $ patch -p1 < /somewhere/ghc-x.x.x.NetBSD-ffi-wrappers.patch
+    (> 7.6) $ patch -p1 < /somewhere/ghc-x.x.x.NetBSD-ffi-wrappers.patch
+    (< 7.6) $ patch -p1 < /somewhere/ghc-x.x.x.NetBSD.patch
+    (< 7.6) $ cd ..
 
-4. Run autoreconf in time::
+4. Run boot.
 
-    $ (cd time && autoreconf)
-
-5. Run autoreconf in base (not necessary for GHC-6.12.3)::
-
-    $ (cd base && autoreconf)
+    $ perl boot
 
 6. Build ghc. (Requires working ghc)
+
+   For example::
+
+   $ ./configure --prefix=/usr/local/ghc-x.x.x --with-gmp-includes=/usr/pkg/include --with-gmp-libraries=/usr/pkg/lib
 
 -----------------
 Supported version
@@ -60,3 +67,6 @@ ghc-7.0.4.NetBSD-ffi-wrappers.patch
 
 ghc-7.4.2.NetBSD-ffi-wrappers.patch
    ghc-7.4.1, ghc-7.4.2
+
+ghc-7.6.1.NetBSD.patch
+   ghc-7.6.1

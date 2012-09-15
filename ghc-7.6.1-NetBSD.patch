@@ -1,0 +1,463 @@
+From 8a6e264af8f11c4c7345fe0bd4f7c082455a13f1 Mon Sep 17 00:00:00 2001
+From: Iku Iwasa <iku.iwasa@gmail.com>
+Date: Sun, 9 Sep 2012 14:15:52 +0900
+Subject: [PATCH] Adapt for NetBSD.
+
+---
+ libraries/base/GHC/Event/KQueue.hsc                | 26 +++++++++++++--
+ libraries/base/configure.ac                        |  6 ++++
+ libraries/base/include/EventConfig.h.in            |  6 ++++
+ libraries/base/include/HsBase.h                    | 13 ++++++++
+ .../Console/Haskeline/Backend/Posix/IConv.hsc      |  2 +-
+ libraries/haskeline/cbits/h_iconv.c                |  7 ++++
+ libraries/haskeline/includes/h_iconv.h             |  1 +
+ libraries/old-time/System/Time.hsc                 |  8 ++---
+ libraries/old-time/cbits/timeUtils.c               | 20 ++++++++++++
+ libraries/old-time/include/HsTime.h                |  5 +++
+ libraries/time/Data/Time/Clock/CTimeval.hs         | 38 ++++++++++++++++++----
+ libraries/time/cbits/HsTime.c                      |  5 +++
+ libraries/time/configure.ac                        |  5 +++
+ libraries/time/include/HsTime.h                    |  1 +
+ libraries/time/test/Makefile                       |  2 +-
+ libraries/unix/System/Posix/Signals.hsc            | 13 ++++++--
+ rts/posix/OSThreads.c                              |  7 ++--
+ 17 files changed, 145 insertions(+), 20 deletions(-)
+
+diff --git a/libraries/base/GHC/Event/KQueue.hsc b/libraries/base/GHC/Event/KQueue.hsc
+index 68aade3..edf67c9 100644
+--- a/libraries/base/GHC/Event/KQueue.hsc
++++ b/libraries/base/GHC/Event/KQueue.hsc
+@@ -50,6 +50,8 @@ import qualified GHC.Event.Array as A
+ #if defined(HAVE_KEVENT64)
+ import Data.Int (Int64)
+ import Data.Word (Word64)
++#elif defined(netbsd_HOST_OS)
++import Data.Int (Int64)
+ #endif
+ 
+ #include <sys/types.h>
+@@ -172,7 +174,7 @@ data Event = KEvent {
+     , filter :: {-# UNPACK #-} !Filter
+     , flags  :: {-# UNPACK #-} !Flag
+     , fflags :: {-# UNPACK #-} !FFlag
+-    , data_  :: {-# UNPACK #-} !CIntPtr
++    , data_  :: {-# UNPACK #-} !FData
+     , udata  :: {-# UNPACK #-} !(Ptr ())
+     } deriving Show
+ 
+@@ -210,7 +212,14 @@ newtype FFlag = FFlag Word32
+  , noteEOF = NOTE_EOF
+  }
+ 
++#ifndef SIZEOF_KEV_FLAGS
++#error "SIZEOF_KEV_FLAGS is not defined, run autoreconf!"
++#endif
++#if SIZEOF_KEV_FLAGS == 4 /* NetBSD uses uint32_t for kevent.flag */
++newtype Flag = Flag Word32
++#else
+ newtype Flag = Flag Word16
++#endif
+     deriving (Eq, Show, Storable)
+ 
+ #{enum Flag, Flag
+@@ -218,7 +227,14 @@ newtype Flag = Flag Word16
+  , flagDelete  = EV_DELETE
+  }
+ 
++#ifndef SIZEOF_KEV_FILTER
++#error "SIZEOF_KEV_FILTER is not defined, run autoreconf!"
++#endif
++#if SIZEOF_KEV_FILTER == 4 /* NetBSD uses uint32_t for kevent.filter */
++newtype Filter = Filter Word32
++#else
+ newtype Filter = Filter Word16
++#endif
+     deriving (Bits, Eq, Num, Show, Storable)
+ 
+ #{enum Filter, Filter
+@@ -226,6 +242,12 @@ newtype Filter = Filter Word16
+  , filterWrite  = EVFILT_WRITE
+  }
+ 
++#ifdef netbsd_HOST_OS
++type FData = Int64
++#else
++type FData = CIntPtr
++#endif
++
+ data TimeSpec = TimeSpec {
+       tv_sec  :: {-# UNPACK #-} !CTime
+     , tv_nsec :: {-# UNPACK #-} !CLong
+@@ -291,7 +313,7 @@ foreign import ccall safe "kevent64"
+     c_kevent64 :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
+                -> Ptr TimeSpec -> IO CInt
+ #elif defined(HAVE_KEVENT)
+-foreign import ccall safe "kevent"
++foreign import ccall safe "__hscore_kevent"
+     c_kevent :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
+              -> Ptr TimeSpec -> IO CInt
+ #else
+diff --git a/libraries/base/configure.ac b/libraries/base/configure.ac
+index 0ce53b7..b679520 100644
+--- a/libraries/base/configure.ac
++++ b/libraries/base/configure.ac
+@@ -51,6 +51,12 @@ fi
+ 
+ if test "$ac_cv_header_sys_event_h" = yes -a "$ac_cv_func_kqueue" = yes; then
+   AC_DEFINE([HAVE_KQUEUE], [1], [Define if you have kqueue support.])
++
++  AC_CHECK_SIZEOF([kev.filter], [], [#include <sys/event.h>
++struct kevent kev;])
++
++  AC_CHECK_SIZEOF([kev.flags], [], [#include <sys/event.h>
++struct kevent kev;])
+ fi
+ 
+ if test "$ac_cv_header_poll_h" = yes -a "$ac_cv_func_poll" = yes; then
+diff --git a/libraries/base/include/EventConfig.h.in b/libraries/base/include/EventConfig.h.in
+index 032ceb1..061b6ac 100644
+--- a/libraries/base/include/EventConfig.h.in
++++ b/libraries/base/include/EventConfig.h.in
+@@ -83,3 +83,9 @@
+ 
+ /* Define to 1 if you have the ANSI C header files. */
+ #undef STDC_HEADERS
++
++/* The size of `kev.filter', as computed by sizeof. */
++#undef SIZEOF_KEV_FILTER
++
++/* The size of `kev.flags', as computed by sizeof. */
++#undef SIZEOF_KEV_FLAGS
+diff --git a/libraries/base/include/HsBase.h b/libraries/base/include/HsBase.h
+index 74ab816..828b480 100644
+--- a/libraries/base/include/HsBase.h
++++ b/libraries/base/include/HsBase.h
+@@ -155,6 +155,10 @@ extern HsWord64 getMonotonicUSec(void);
+ #include <sys/select.h>
+ #endif
+ 
++#if HAVE_SYS_EVENT_H
++#include <sys/event.h>
++#endif
++
+ /* in inputReady.c */
+ extern int fdReady(int fd, int write, int msecs, int isSock);
+ 
+@@ -541,6 +545,15 @@ INLINE int __hscore_open(char *file, int how, mode_t mode) {
+ }
+ #endif
+ 
++#ifdef HAVE_KQUEUE
++INLINE int __hscore_kevent(int kq, const struct kevent *changelist,
++                           size_t nchanges, struct kevent *eventlist,
++                           size_t nevents, const struct timespec *timeout) {
++	return kevent(kq, changelist, nchanges, eventlist, nevents, timeout);
++}
++#endif
++
++
+ #if darwin_HOST_OS
+ // You should not access _environ directly on Darwin in a bundle/shared library.
+ // See #2458 and http://developer.apple.com/library/mac/#documentation/Darwin/Reference/ManPages/man7/environ.7.html
+diff --git a/libraries/haskeline/System/Console/Haskeline/Backend/Posix/IConv.hsc b/libraries/haskeline/System/Console/Haskeline/Backend/Posix/IConv.hsc
+index 56691cb..bcbe9c8 100644
+--- a/libraries/haskeline/System/Console/Haskeline/Backend/Posix/IConv.hsc
++++ b/libraries/haskeline/System/Console/Haskeline/Backend/Posix/IConv.hsc
+@@ -65,7 +65,7 @@ openPartialDecoder codeset = do
+ ---------------------
+ -- Setting the locale
+ 
+-foreign import ccall "setlocale" c_setlocale :: CInt -> CString -> IO CString
++foreign import ccall "setlocale" h_setlocale :: CInt -> CString -> IO CString
+ 
+ setLocale :: Maybe String -> IO (Maybe String)
+ setLocale oldLocale = (maybeWith withCAString) oldLocale $ \loc_p -> do
+diff --git a/libraries/haskeline/cbits/h_iconv.c b/libraries/haskeline/cbits/h_iconv.c
+index 7f8e17a..5294026 100644
+--- a/libraries/haskeline/cbits/h_iconv.c
++++ b/libraries/haskeline/cbits/h_iconv.c
+@@ -1,5 +1,7 @@
+ #include "h_iconv.h"
+ 
++#include <locale.h>
++
+ // Wrapper functions, since iconv_open et al are macros in libiconv.
+ iconv_t haskeline_iconv_open(const char *tocode, const char *fromcode) {
+     return iconv_open(tocode, fromcode);
+@@ -16,3 +18,8 @@ size_t haskeline_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
+     // a (char **).
+     return iconv(cd, (void*)inbuf, inbytesleft, outbuf, outbytesleft);
+ }
++
++char *h_setlocale(int category, const char *locale)
++{
++    return setlocale(category, locale);
++}
+diff --git a/libraries/haskeline/includes/h_iconv.h b/libraries/haskeline/includes/h_iconv.h
+index b4a88c3..b3b8d20 100644
+--- a/libraries/haskeline/includes/h_iconv.h
++++ b/libraries/haskeline/includes/h_iconv.h
+@@ -7,3 +7,4 @@ void haskeline_iconv_close(iconv_t cd);
+ size_t haskeline_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
+                 char **outbuf, size_t *outbytesleft);
+ 
++char *h_setlocale(int category, const char *locale);
+diff --git a/libraries/old-time/System/Time.hsc b/libraries/old-time/System/Time.hsc
+index b2ff466..0692364 100644
+--- a/libraries/old-time/System/Time.hsc
++++ b/libraries/old-time/System/Time.hsc
+@@ -748,17 +748,17 @@ type CTm = () -- struct tm
+ foreign import ccall unsafe "HsTime.h __hscore_localtime_r"
+     localtime_r :: Ptr CTime -> Ptr CTm -> IO (Ptr CTm)
+ #else
+-foreign import ccall unsafe "time.h localtime"
++foreign import ccall unsafe "time.h __hscore_localtime"
+     localtime   :: Ptr CTime -> IO (Ptr CTm)
+ #endif
+ #if HAVE_GMTIME_R
+ foreign import ccall unsafe "HsTime.h __hscore_gmtime_r"
+     gmtime_r    :: Ptr CTime -> Ptr CTm -> IO (Ptr CTm)
+ #else
+-foreign import ccall unsafe "time.h gmtime"
++foreign import ccall unsafe "time.h __hscore_gmtime"
+     gmtime      :: Ptr CTime -> IO (Ptr CTm)
+ #endif
+-foreign import ccall unsafe "time.h mktime"
++foreign import ccall unsafe "time.h __hscore_mktime"
+     mktime      :: Ptr CTm   -> IO CTime
+ 
+ #if HAVE_GETTIMEOFDAY
+@@ -774,6 +774,6 @@ foreign import ccall unsafe "time.h ftime" ftime :: Ptr CTimeB -> IO CInt
+ foreign import ccall unsafe "time.h ftime" ftime :: Ptr CTimeB -> IO ()
+ #endif
+ #else
+-foreign import ccall unsafe "time.h time" time :: Ptr CTime -> IO CTime
++foreign import ccall unsafe "time.h __hscore_time" time :: Ptr CTime -> IO CTime
+ #endif
+ #endif /* ! __HUGS__ */
+diff --git a/libraries/old-time/cbits/timeUtils.c b/libraries/old-time/cbits/timeUtils.c
+index d2d9ef4..f2131cb 100644
+--- a/libraries/old-time/cbits/timeUtils.c
++++ b/libraries/old-time/cbits/timeUtils.c
+@@ -35,4 +35,24 @@ long *__hscore_timezone( void )
+ char **__hscore_tzname( void )
+ { return _tzname; }
+ #endif
++
++struct tm *__hscore_localtime(const time_t *clock)
++{
++    return localtime(clock);
++}
++
++struct tm *__hscore_gmtime(const time_t *clock)
++{
++    return gmtime(clock);
++}
++
++time_t __hscore_mktime(struct tm *tm)
++{
++    return mktime(tm);
++}
++
++time_t __hscore_time(time_t *clock)
++{
++    return time(clock);
++}
+ #endif
+diff --git a/libraries/old-time/include/HsTime.h b/libraries/old-time/include/HsTime.h
+index 638ad6c..8b787a8 100644
+--- a/libraries/old-time/include/HsTime.h
++++ b/libraries/old-time/include/HsTime.h
+@@ -46,4 +46,9 @@ extern struct tm *__hscore_gmtime_r(const time_t *clock, struct tm *result);
+ extern struct tm *__hscore_localtime_r(const time_t *clock, struct tm *result);
+ #endif
+ 
++struct tm *__hscore_localtime(const time_t *clock);
++struct tm *__hscore_gmtime(const time_t *clock);
++time_t __hscore_mktime(struct tm *tm);
++time_t __hscore_time(time_t *clock);
++
+ #endif /* __TIMEUTILS_H__ */
+diff --git a/libraries/time/Data/Time/Clock/CTimeval.hs b/libraries/time/Data/Time/Clock/CTimeval.hs
+index 5e0ffdf..b55eb56 100644
+--- a/libraries/time/Data/Time/Clock/CTimeval.hs
++++ b/libraries/time/Data/Time/Clock/CTimeval.hs
+@@ -7,20 +7,44 @@ module Data.Time.Clock.CTimeval where
+ import Foreign
+ import Foreign.C
+ 
+-data CTimeval = MkCTimeval CLong CLong
++#include "HsTimeConfig.h"
++
++--
++-- we assume time_t and suseconds_t are either long long, long or int.
++--
++#ifndef SIZEOF_TIME_T
++#error "SIZEOF_TIME_T is not defined, run autoreconf!"
++#endif
++#if SIZEOF_TIME_T == SIZEOF_LONG_LONG
++type TimeT = CLLong
++#elif SIZEOF_TIME_T == SIZEOF_LONG
++type TimeT = CLong
++#elif SIZEOF_TIME_T == SIZEOF_INT
++type TimeT = CInt
++#endif
++
++#if SIZEOF_SUSECONDS_T == SIZEOF_LONG_LONG
++type SusecondsT = CLLong
++#elif SIZEOF_SUSECONDS_T == SIZEOF_LONG
++type SusecondsT = CLong
++#elif SIZEOF_SUSECONDS_T == SIZEOF_INT
++type SusecondsT = CInt
++#endif
++
++data CTimeval = MkCTimeval TimeT SusecondsT
+ 
+ instance Storable CTimeval where
+-	sizeOf _ = (sizeOf (undefined :: CLong)) * 2
++	sizeOf _ = sizeOf (undefined :: TimeT) + sizeOf (undefined :: SusecondsT)
+ 	alignment _ = alignment (undefined :: CLong)
+ 	peek p = do
+-		s   <- peekElemOff (castPtr p) 0
+-		mus <- peekElemOff (castPtr p) 1
++		s   <- peekByteOff p 0
++		mus <- peekByteOff p (sizeOf (undefined :: TimeT))
+ 		return (MkCTimeval s mus)
+ 	poke p (MkCTimeval s mus) = do
+-		pokeElemOff (castPtr p) 0 s
+-		pokeElemOff (castPtr p) 1 mus
++		pokeByteOff p 0 s
++		pokeByteOff p (sizeOf (undefined :: TimeT)) mus
+ 
+-foreign import ccall unsafe "time.h gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
++foreign import ccall unsafe "HsTime.h __hstime_gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
+ 
+ -- | Get the current POSIX time from the system clock.
+ getCTimeval :: IO CTimeval
+diff --git a/libraries/time/cbits/HsTime.c b/libraries/time/cbits/HsTime.c
+index dacb1d4..3f835f2 100644
+--- a/libraries/time/cbits/HsTime.c
++++ b/libraries/time/cbits/HsTime.c
+@@ -38,3 +38,8 @@ long int get_current_timezone_seconds (time_t t,int* pdst,char const* * pname)
+ 	}
+ 	else return 0x80000000;
+ }
++
++int __hstime_gettimeofday(struct timeval *tv, void *tz)
++{
++	return gettimeofday(tv, tz);
++}
+diff --git a/libraries/time/configure.ac b/libraries/time/configure.ac
+index dc58c49..cb5cb96 100644
+--- a/libraries/time/configure.ac
++++ b/libraries/time/configure.ac
+@@ -12,6 +12,11 @@ AC_CONFIG_HEADERS([include/HsTimeConfig.h])
+ 
+ AC_CHECK_HEADERS([time.h])
+ AC_CHECK_FUNCS([gmtime_r localtime_r])
++AC_CHECK_SIZEOF([time_t])
++AC_CHECK_SIZEOF([suseconds_t])
++AC_CHECK_SIZEOF([int])
++AC_CHECK_SIZEOF([long])
++AC_CHECK_SIZEOF([long long])
+ 
+ AC_STRUCT_TM
+ AC_STRUCT_TIMEZONE
+diff --git a/libraries/time/include/HsTime.h b/libraries/time/include/HsTime.h
+index 5296437..dfe05fe 100644
+--- a/libraries/time/include/HsTime.h
++++ b/libraries/time/include/HsTime.h
+@@ -19,5 +19,6 @@
+ #endif
+ 
+ long int get_current_timezone_seconds (time_t,int* pdst,char const* * pname);
++int __hstime_gettimeofday(struct timeval*, void*);
+ 
+ #endif
+diff --git a/libraries/time/test/Makefile b/libraries/time/test/Makefile
+index ca57f7d..45980c1 100644
+--- a/libraries/time/test/Makefile
++++ b/libraries/time/test/Makefile
+@@ -2,7 +2,7 @@ GHC = ghc
+ GHCFLAGS = -package time -package QuickCheck-1.2.0.1
+ 
+ default:
+-	make CurrentTime.run ShowDST.run test
++	$(MAKE) CurrentTime.run ShowDST.run test
+ 
+ TestMonthDay: TestMonthDay.o
+ 	$(GHC) $(GHCFLAGS) $^ -o $@
+diff --git a/libraries/unix/System/Posix/Signals.hsc b/libraries/unix/System/Posix/Signals.hsc
+index 8195845..9c4f507 100644
+--- a/libraries/unix/System/Posix/Signals.hsc
++++ b/libraries/unix/System/Posix/Signals.hsc
+@@ -598,8 +598,13 @@ awaitSignal maybe_sigset = do
+   -- XXX My manpage says it can also return EFAULT. And why is ignoring
+   -- EINTR the right thing to do?
+ 
++#ifdef __HUGS__
+ foreign import ccall unsafe "sigsuspend"
+   c_sigsuspend :: Ptr CSigset -> IO CInt
++#else
++foreign import capi unsafe "signal.h sigsuspend"
++  c_sigsuspend :: Ptr CSigset -> IO CInt
++#endif
+ #endif
+ 
+ #ifdef __HUGS__
+@@ -611,6 +616,9 @@ foreign import ccall unsafe "sigfillset"
+ 
+ foreign import ccall unsafe "sigismember"
+   c_sigismember :: Ptr CSigset -> CInt -> IO CInt
++
++foreign import ccall unsafe "sigpending"
++  c_sigpending :: Ptr CSigset -> IO CInt
+ #else
+ foreign import capi unsafe "signal.h sigdelset"
+   c_sigdelset   :: Ptr CSigset -> CInt -> IO CInt
+@@ -620,8 +628,7 @@ foreign import capi unsafe "signal.h sigfillset"
+ 
+ foreign import capi unsafe "signal.h sigismember"
+   c_sigismember :: Ptr CSigset -> CInt -> IO CInt
+-#endif /* __HUGS__ */
+ 
+-foreign import ccall unsafe "sigpending"
++foreign import capi unsafe "signal.h sigpending"
+   c_sigpending :: Ptr CSigset -> IO CInt
+-
++#endif /* __HUGS__ */
+diff --git a/rts/posix/OSThreads.c b/rts/posix/OSThreads.c
+index c294548..620292e 100644
+--- a/rts/posix/OSThreads.c
++++ b/rts/posix/OSThreads.c
+@@ -20,6 +20,9 @@
+  * because of some specific types, like u_char, u_int, etc. */
+ #define __BSD_VISIBLE	1
+ #endif
++#if defined(netbsd_HOST_OS)
++#define _NETBSD_SOURCE	1
++#endif
+ 
+ #include "Rts.h"
+ 
+@@ -31,7 +34,7 @@
+ #include <string.h>
+ #endif
+ 
+-#if defined(darwin_HOST_OS) || defined(freebsd_HOST_OS)
++#if defined(darwin_HOST_OS) || defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS)
+ #include <sys/types.h>
+ #include <sys/sysctl.h>
+ #endif
+@@ -223,7 +226,7 @@ getNumberOfProcessors (void)
+         nproc = sysconf(_SC_NPROCESSORS_ONLN);
+ #elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_CONF)
+         nproc = sysconf(_SC_NPROCESSORS_CONF);
+-#elif defined(darwin_HOST_OS) || defined(freebsd_HOST_OS)
++#elif defined(darwin_HOST_OS) || defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS)
+         size_t size = sizeof(nat);
+         if(0 != sysctlbyname("hw.ncpu",&nproc,&size,NULL,0))
+             nproc = 1;
+-- 
+1.7.12
+
