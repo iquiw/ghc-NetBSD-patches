@@ -42,8 +42,8 @@ How to use?
 
 3. Apply the patch::
 
-    (> 7.6) $ patch -p1 < /somewhere/ghc-x.x.x.NetBSD-ffi-wrappers.patch
-    (< 7.6) $ patch -p1 < /somewhere/ghc-x.x.x.NetBSD.patch
+    (> 7.6) $ patch -p1 < /somewhere/ghc-x.x.x.NetBSD.patch
+    (< 7.6) $ patch -p1 < /somewhere/ghc-x.x.x.NetBSD-ffi-wrappers.patch
     (< 7.6) $ cd ..
 
 4. Run boot.
