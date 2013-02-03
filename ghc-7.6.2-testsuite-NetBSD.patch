@@ -1,0 +1,65 @@
+From 7c33f08a2003a93e9c1fdb8665f84bc006b4828a Mon Sep 17 00:00:00 2001
+From: Iku Iwasa <iku.iwasa@gmail.com>
+Date: Sun, 3 Feb 2013 10:04:10 +0900
+Subject: [PATCH] Adapt for NetBSD
+
+---
+ mk/boilerplate.mk      | 2 +-
+ tests/plugins/Makefile | 4 ++--
+ timeout/calibrate      | 2 +-
+ timeout/timeout.py     | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/mk/boilerplate.mk b/mk/boilerplate.mk
+index 28610d7..98e371f 100644
+--- a/mk/boilerplate.mk
++++ b/mk/boilerplate.mk
+@@ -137,7 +137,7 @@ $(eval $(call canonicalise,TOP_ABS))
+ GS = gs
+ CP = cp
+ RM = rm -f
+-PYTHON = python
++PYTHON = python2.7
+ 
+ # -----------------------------------------------------------------------------
+ # configuration of TEST_HC
+diff --git a/tests/plugins/Makefile b/tests/plugins/Makefile
+index 79b1217..4e67fe1 100644
+--- a/tests/plugins/Makefile
++++ b/tests/plugins/Makefile
+@@ -11,10 +11,10 @@ plugins01:
+ 	# the output of the call to the TEST_HC (probably just the last 2).
+ 	#
+ 	# Suggestions to make this better gratefully recieved.
+-	(cd simple-plugin; make package)
++	(cd simple-plugin; $(MAKE) package)
+ 	$(RM) plugins01.hi plugins01.o
+ 	"$(TEST_HC)" $(HC_OPTS) --make -v0 plugins01.hs -package-db simple-plugin/local.package.conf -fplugin Simple.Plugin -fplugin-opt Simple.Plugin:Irrelevant_Option -package simple-plugin
+ 	./plugins01
+ 
+ clean:
+-	cd simple-plugin && make clean
++	cd simple-plugin && $(MAKE) clean
+diff --git a/timeout/calibrate b/timeout/calibrate
+index b0d75da..67f8e50 100644
+--- a/timeout/calibrate
++++ b/timeout/calibrate
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python2.7
+ 
+ import math
+ import os
+diff --git a/timeout/timeout.py b/timeout/timeout.py
+index 76660a7..254b763 100644
+--- a/timeout/timeout.py
++++ b/timeout/timeout.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python2.7
+ 
+ import errno
+ import os
+-- 
+1.8.1.2
+

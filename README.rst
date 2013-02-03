@@ -70,3 +70,6 @@ ghc-7.4.2.NetBSD-ffi-wrappers.patch
 
 ghc-7.6.1.NetBSD.patch
    ghc-7.6.1
+
+ghc-7.6.2.NetBSD.patch
+   ghc-7.6.2
