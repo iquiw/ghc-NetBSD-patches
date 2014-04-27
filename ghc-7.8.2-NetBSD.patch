@@ -1,9 +1,11 @@
-From 89b40696daf3e11af599f7ca32b62b6d9d1ce8b9 Mon Sep 17 00:00:00 2001
+From 9c4166bd346246969a4fe4675d5f36d8b7b1a849 Mon Sep 17 00:00:00 2001
 From: Iku Iwasa <iku.iwasa@gmail.com>
-Date: Sun, 13 Apr 2014 09:26:57 +0900
+Date: Sat, 19 Apr 2014 18:11:11 +0900
 Subject: [PATCH] Adapt to NetBSD
 
 ---
+ libraries/base/GHC/Event/KQueue.hsc                |  2 +-
+ libraries/base/System/Environment.hs               |  3 +-
  libraries/base/include/EventConfig.h.in            |  6 ++++
  .../Console/Haskeline/Backend/Posix/IConv.hsc      |  2 +-
  libraries/old-time/System/Time.hsc                 |  8 ++---
@@ -11,10 +13,47 @@ Subject: [PATCH] Adapt to NetBSD
  libraries/time/Data/Time/Clock/CTimeval.hs         | 38 ++++++++++++++++++----
  libraries/time/configure.ac                        |  5 +++
  libraries/time/time.cabal                          |  1 +
+ libraries/unix/System/Posix/Env.hsc                |  3 +-
+ libraries/unix/System/Posix/Env/ByteString.hsc     |  3 +-
+ libraries/unix/System/Posix/Files/Common.hsc       |  7 ++--
  libraries/unix/System/Posix/Signals.hsc            | 13 ++++++--
+ mk/config.mk.in                                    |  2 +-
  rts/posix/OSThreads.c                              |  7 ++--
- 9 files changed, 65 insertions(+), 16 deletions(-)
+ 15 files changed, 77 insertions(+), 24 deletions(-)
 
+diff --git a/libraries/base/GHC/Event/KQueue.hsc b/libraries/base/GHC/Event/KQueue.hsc
+index bc88855..a162e7f 100644
+--- a/libraries/base/GHC/Event/KQueue.hsc
++++ b/libraries/base/GHC/Event/KQueue.hsc
+@@ -287,7 +287,7 @@ foreign import capi safe "sys/event.h kevent"
+     c_kevent :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
+              -> Ptr TimeSpec -> IO CInt
+ 
+-foreign import ccall unsafe "kevent"
++foreign import capi unsafe "sys/event.h kevent"
+     c_kevent_unsafe :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
+                     -> Ptr TimeSpec -> IO CInt
+ #else
+diff --git a/libraries/base/System/Environment.hs b/libraries/base/System/Environment.hs
+index b238360..af9f952 100644
+--- a/libraries/base/System/Environment.hs
++++ b/libraries/base/System/Environment.hs
+@@ -1,5 +1,6 @@
+ {-# LANGUAGE Safe #-}
+ {-# LANGUAGE CPP #-}
++{-# LANGUAGE CApiFFI #-}
+ 
+ -----------------------------------------------------------------------------
+ -- |
+@@ -304,7 +305,7 @@ putEnv keyvalue = do
+   -- enviroment.
+   throwErrnoIf_ (/= 0) "putenv" (c_putenv s)
+ 
+-foreign import ccall unsafe "putenv" c_putenv :: CString -> IO CInt
++foreign import capi unsafe "stdlib.h putenv" c_putenv :: CString -> IO CInt
+ #endif
+ 
+ -- | @unSet name@ removes the specified environment variable from the
 diff --git a/libraries/base/include/EventConfig.h.in b/libraries/base/include/EventConfig.h.in
 index 061b6ac..6438f44 100644
 --- a/libraries/base/include/EventConfig.h.in
@@ -171,6 +210,77 @@ index fad816c..acd6726 100644
          cpp-options: -DLANGUAGE_Rank2Types -DLANGUAGE_DeriveDataTypeable -DLANGUAGE_StandaloneDeriving
      else
          if impl(hugs)
+diff --git a/libraries/unix/System/Posix/Env.hsc b/libraries/unix/System/Posix/Env.hsc
+index fbe5c79..8ca93d9 100644
+--- a/libraries/unix/System/Posix/Env.hsc
++++ b/libraries/unix/System/Posix/Env.hsc
+@@ -1,5 +1,6 @@
+ #ifdef __GLASGOW_HASKELL__
+ {-# LANGUAGE Trustworthy #-}
++{-# LANGUAGE CApiFFI #-}
+ #endif
+ -----------------------------------------------------------------------------
+ -- |
+@@ -140,7 +141,7 @@ putEnv keyvalue = do s <- newFilePath keyvalue
+       newFilePath fp = getFileSystemEncoding >>= \enc -> GHC.newCString enc fp
+ #endif
+ 
+-foreign import ccall unsafe "putenv"
++foreign import capi unsafe "stdlib.h putenv"
+    c_putenv :: CString -> IO CInt
+ 
+ {- |The 'setEnv' function inserts or resets the environment variable name in
+diff --git a/libraries/unix/System/Posix/Env/ByteString.hsc b/libraries/unix/System/Posix/Env/ByteString.hsc
+index 1346a77..edd475b 100644
+--- a/libraries/unix/System/Posix/Env/ByteString.hsc
++++ b/libraries/unix/System/Posix/Env/ByteString.hsc
+@@ -1,5 +1,6 @@
+ #ifdef __GLASGOW_HASKELL__
+ {-# LANGUAGE Trustworthy #-}
++{-# LANGUAGE CApiFFI #-}
+ #endif
+ -----------------------------------------------------------------------------
+ -- |
+@@ -114,7 +115,7 @@ putEnv :: ByteString -> IO ()
+ putEnv keyvalue = B.useAsCString keyvalue $ \s ->
+   throwErrnoIfMinus1_ "putenv" (c_putenv s)
+ 
+-foreign import ccall unsafe "putenv"
++foreign import capi unsafe "stdlib.h putenv"
+    c_putenv :: CString -> IO CInt
+ 
+ {- |The 'setEnv' function inserts or resets the environment variable name in
+diff --git a/libraries/unix/System/Posix/Files/Common.hsc b/libraries/unix/System/Posix/Files/Common.hsc
+index 3056014..34f6df8 100644
+--- a/libraries/unix/System/Posix/Files/Common.hsc
++++ b/libraries/unix/System/Posix/Files/Common.hsc
+@@ -1,5 +1,6 @@
+ #ifdef __GLASGOW_HASKELL__
+ {-# LANGUAGE Trustworthy #-}
++{-# LANGUAGE CApiFFI #-}
+ #endif
+ -----------------------------------------------------------------------------
+ -- |
+@@ -456,16 +457,16 @@ toCTimeVal t = CTimeVal sec (truncate $ 10^(6::Int) * frac)
+     (sec, frac) = if (frac' < 0) then (sec' - 1, frac' + 1) else (sec', frac')
+     (sec', frac') = properFraction $ toRational t
+ 
+-foreign import ccall unsafe "utimes"
++foreign import capi unsafe "sys/time.h utimes"
+     c_utimes :: CString -> Ptr CTimeVal -> IO CInt
+ 
+ #ifdef HAVE_LUTIMES
+-foreign import ccall unsafe "lutimes"
++foreign import capi unsafe "sys/time.h lutimes"
+     c_lutimes :: CString -> Ptr CTimeVal -> IO CInt
+ #endif
+ 
+ #if HAVE_FUTIMES
+-foreign import ccall unsafe "futimes"
++foreign import capi unsafe "sys/time.h futimes"
+     c_futimes :: CInt -> Ptr CTimeVal -> IO CInt
+ #endif
+ 
 diff --git a/libraries/unix/System/Posix/Signals.hsc b/libraries/unix/System/Posix/Signals.hsc
 index d4c6d51..439c526 100644
 --- a/libraries/unix/System/Posix/Signals.hsc
@@ -210,6 +320,19 @@ index d4c6d51..439c526 100644
    c_sigpending :: Ptr CSigset -> IO CInt
 +
 +#endif /* __HUGS__ */
+diff --git a/mk/config.mk.in b/mk/config.mk.in
+index 7cc7aec..7ba28fd 100644
+--- a/mk/config.mk.in
++++ b/mk/config.mk.in
+@@ -702,7 +702,7 @@ GZIP_CMD       = gzip
+ XZ_CMD         = xz -9e
+ 
+ # bzip2 is default compression
+-TAR_COMP      = bzip2
++TAR_COMP      = xz
+ 
+ # select compression command and .tar extension based on TAR_COMP value
+ ifeq "$(TAR_COMP)" "bzip2"
 diff --git a/rts/posix/OSThreads.c b/rts/posix/OSThreads.c
 index 13a176c..c5b1555 100644
 --- a/rts/posix/OSThreads.c
