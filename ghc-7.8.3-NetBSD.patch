@@ -1,6 +1,6 @@
-From 9c4166bd346246969a4fe4675d5f36d8b7b1a849 Mon Sep 17 00:00:00 2001
+From c9535950930923f2855a152cabd0ef5e5b75d31a Mon Sep 17 00:00:00 2001
 From: Iku Iwasa <iku.iwasa@gmail.com>
-Date: Sat, 19 Apr 2014 18:11:11 +0900
+Date: Sun, 13 Jul 2014 10:20:00 +0900
 Subject: [PATCH] Adapt to NetBSD
 
 ---
@@ -19,7 +19,8 @@ Subject: [PATCH] Adapt to NetBSD
  libraries/unix/System/Posix/Signals.hsc            | 13 ++++++--
  mk/config.mk.in                                    |  2 +-
  rts/posix/OSThreads.c                              |  7 ++--
- 15 files changed, 77 insertions(+), 24 deletions(-)
+ rules/shell-wrapper.mk                             |  2 +-
+ 16 files changed, 78 insertions(+), 25 deletions(-)
 
 diff --git a/libraries/base/GHC/Event/KQueue.hsc b/libraries/base/GHC/Event/KQueue.hsc
 index bc88855..a162e7f 100644
@@ -365,6 +366,19 @@ index 13a176c..c5b1555 100644
          size_t size = sizeof(nat);
          if(0 != sysctlbyname("hw.ncpu",&nproc,&size,NULL,0))
              nproc = 1;
+diff --git a/rules/shell-wrapper.mk b/rules/shell-wrapper.mk
+index 05dd0ef..ab9841e 100644
+--- a/rules/shell-wrapper.mk
++++ b/rules/shell-wrapper.mk
+@@ -103,7 +103,7 @@ $$($1_$2_BINDIST_WRAPPER): $1/$2/build/tmp/$$($1_$2_PROG)
+ ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
+ 	echo '$$(call prependLibraryPath,$$($1_$2_DEP_LIB_REL_DIRS_SEARCHPATH))' >> $$@
+ endif
+-	echo 'exec "$$<" $$$${1+"$$$$@"}'                                  >> $$@
++	echo 'exec "$$$$PWD/$$<" $$$${1+"$$$$@"}'                                  >> $$@
+ 	$$(EXECUTABLE_FILE)                                                   $$@
+ 
+ endif
 -- 
-1.9.0
+1.9.4
 
