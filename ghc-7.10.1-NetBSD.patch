@@ -1,0 +1,341 @@
+From 0d8901a43e176aed6e973c7852c60bd5257ed005 Mon Sep 17 00:00:00 2001
+From: Iku Iwasa <iku.iwasa@gmail.com>
+Date: Sun, 29 Mar 2015 10:00:06 +0900
+Subject: [PATCH] Adapt to NetBSD
+
+---
+ libraries/base/GHC/Event/KQueue.hsc                |  2 +-
+ libraries/base/System/Environment.hs               |  3 +-
+ libraries/base/include/EventConfig.h.in            |  6 ++++
+ .../Console/Haskeline/Backend/Posix/IConv.hsc      |  2 +-
+ libraries/time/configure.ac                        |  5 +++
+ libraries/time/lib/Data/Time/Clock/CTimeval.hs     | 38 ++++++++++++++++++----
+ libraries/time/time.cabal                          |  1 +
+ libraries/unix/System/Posix/Env.hsc                |  5 ++-
+ libraries/unix/System/Posix/Env/ByteString.hsc     |  3 +-
+ libraries/unix/System/Posix/Files/Common.hsc       |  7 ++--
+ libraries/unix/System/Posix/Signals.hsc            | 13 ++++++--
+ mk/config.mk.in                                    |  2 +-
+ rts/posix/OSThreads.c                              |  7 ++--
+ rules/shell-wrapper.mk                             |  2 +-
+ 14 files changed, 75 insertions(+), 21 deletions(-)
+
+diff --git a/libraries/base/GHC/Event/KQueue.hsc b/libraries/base/GHC/Event/KQueue.hsc
+index 2b8d443..e909d09 100644
+--- a/libraries/base/GHC/Event/KQueue.hsc
++++ b/libraries/base/GHC/Event/KQueue.hsc
+@@ -284,7 +284,7 @@ foreign import capi safe "sys/event.h kevent"
+     c_kevent :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
+              -> Ptr TimeSpec -> IO CInt
+ 
+-foreign import ccall unsafe "kevent"
++foreign import capi unsafe "sys/event.h kevent"
+     c_kevent_unsafe :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
+                     -> Ptr TimeSpec -> IO CInt
+ #else
+diff --git a/libraries/base/System/Environment.hs b/libraries/base/System/Environment.hs
+index 066329c..6df4332 100644
+--- a/libraries/base/System/Environment.hs
++++ b/libraries/base/System/Environment.hs
+@@ -1,5 +1,6 @@
+ {-# LANGUAGE Safe #-}
+ {-# LANGUAGE CPP #-}
++{-# LANGUAGE CApiFFI #-}
+ 
+ -----------------------------------------------------------------------------
+ -- |
+@@ -302,7 +303,7 @@ putEnv keyvalue = do
+   -- enviroment.
+   throwErrnoIf_ (/= 0) "putenv" (c_putenv s)
+ 
+-foreign import ccall unsafe "putenv" c_putenv :: CString -> IO CInt
++foreign import capi unsafe "stdlib.h putenv" c_putenv :: CString -> IO CInt
+ #endif
+ 
+ -- | @unSet name@ removes the specified environment variable from the
+diff --git a/libraries/base/include/EventConfig.h.in b/libraries/base/include/EventConfig.h.in
+index 061b6ac..6438f44 100644
+--- a/libraries/base/include/EventConfig.h.in
++++ b/libraries/base/include/EventConfig.h.in
+@@ -89,3 +89,9 @@
+ 
+ /* The size of `kev.flags', as computed by sizeof. */
+ #undef SIZEOF_KEV_FLAGS
++
++/* The size of `kev.filter', as computed by sizeof. */
++#undef SIZEOF_KEV_FILTER
++
++/* The size of `kev.flags', as computed by sizeof. */
++#undef SIZEOF_KEV_FLAGS
+diff --git a/libraries/haskeline/System/Console/Haskeline/Backend/Posix/IConv.hsc b/libraries/haskeline/System/Console/Haskeline/Backend/Posix/IConv.hsc
+index 56691cb..3f920fc 100644
+--- a/libraries/haskeline/System/Console/Haskeline/Backend/Posix/IConv.hsc
++++ b/libraries/haskeline/System/Console/Haskeline/Backend/Posix/IConv.hsc
+@@ -65,7 +65,7 @@ openPartialDecoder codeset = do
+ ---------------------
+ -- Setting the locale
+ 
+-foreign import ccall "setlocale" c_setlocale :: CInt -> CString -> IO CString
++foreign import capi "locale.h setlocale" c_setlocale :: CInt -> CString -> IO CString
+ 
+ setLocale :: Maybe String -> IO (Maybe String)
+ setLocale oldLocale = (maybeWith withCAString) oldLocale $ \loc_p -> do
+diff --git a/libraries/time/configure.ac b/libraries/time/configure.ac
+index 2b2149a..132e6a0 100644
+--- a/libraries/time/configure.ac
++++ b/libraries/time/configure.ac
+@@ -14,6 +14,11 @@ AC_CONFIG_HEADERS([lib/include/HsTimeConfig.h])
+ 
+ AC_CHECK_HEADERS([time.h])
+ AC_CHECK_FUNCS([gmtime_r localtime_r])
++AC_CHECK_SIZEOF([time_t])
++AC_CHECK_SIZEOF([suseconds_t])
++AC_CHECK_SIZEOF([int])
++AC_CHECK_SIZEOF([long])
++AC_CHECK_SIZEOF([long long])
+ 
+ AC_STRUCT_TM
+ AC_STRUCT_TIMEZONE
+diff --git a/libraries/time/lib/Data/Time/Clock/CTimeval.hs b/libraries/time/lib/Data/Time/Clock/CTimeval.hs
+index 012501a..8f62d06 100644
+--- a/libraries/time/lib/Data/Time/Clock/CTimeval.hs
++++ b/libraries/time/lib/Data/Time/Clock/CTimeval.hs
+@@ -11,20 +11,44 @@ import Foreign.Safe
+ #endif
+ import Foreign.C
+ 
+-data CTimeval = MkCTimeval CLong CLong
++#include "HsTimeConfig.h"
++
++--
++-- we assume time_t and suseconds_t are either long long, long or int.
++--
++#ifndef SIZEOF_TIME_T
++#error "SIZEOF_TIME_T is not defined, run autoreconf!"
++#endif
++#if SIZEOF_TIME_T == SIZEOF_LONG_LONG
++type TimeT = CLLong
++#elif SIZEOF_TIME_T == SIZEOF_LONG
++type TimeT = CLong
++#elif SIZEOF_TIME_T == SIZEOF_INT
++type TimeT = CInt
++#endif
++
++#if SIZEOF_SUSECONDS_T == SIZEOF_LONG_LONG
++type SusecondsT = CLLong
++#elif SIZEOF_SUSECONDS_T == SIZEOF_LONG
++type SusecondsT = CLong
++#elif SIZEOF_SUSECONDS_T == SIZEOF_INT
++type SusecondsT = CInt
++#endif
++
++data CTimeval = MkCTimeval TimeT SusecondsT
+ 
+ instance Storable CTimeval where
+-	sizeOf _ = (sizeOf (undefined :: CLong)) * 2
++	sizeOf _ = sizeOf (undefined :: TimeT) + sizeOf (undefined :: SusecondsT)
+ 	alignment _ = alignment (undefined :: CLong)
+ 	peek p = do
+-		s   <- peekElemOff (castPtr p) 0
+-		mus <- peekElemOff (castPtr p) 1
++		s   <- peekByteOff p 0
++		mus <- peekByteOff p (sizeOf (undefined :: TimeT))
+ 		return (MkCTimeval s mus)
+ 	poke p (MkCTimeval s mus) = do
+-		pokeElemOff (castPtr p) 0 s
+-		pokeElemOff (castPtr p) 1 mus
++		pokeByteOff p 0 s
++		pokeByteOff p (sizeOf (undefined :: TimeT)) mus
+ 
+-foreign import ccall unsafe "time.h gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
++foreign import capi unsafe "HsTime.h gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
+ 
+ -- | Get the current POSIX time from the system clock.
+ getCTimeval :: IO CTimeval
+diff --git a/libraries/time/time.cabal b/libraries/time/time.cabal
+index c1a82be..fdac8b4 100644
+--- a/libraries/time/time.cabal
++++ b/libraries/time/time.cabal
+@@ -45,6 +45,7 @@ library
+             Rank2Types
+             DeriveDataTypeable
+             StandaloneDeriving
++            CApiFFI
+         cpp-options: -DLANGUAGE_Rank2Types -DLANGUAGE_DeriveDataTypeable -DLANGUAGE_StandaloneDeriving
+     else
+         if impl(hugs)
+diff --git a/libraries/unix/System/Posix/Env.hsc b/libraries/unix/System/Posix/Env.hsc
+index 95b7bc8..09ed7bd 100644
+--- a/libraries/unix/System/Posix/Env.hsc
++++ b/libraries/unix/System/Posix/Env.hsc
+@@ -3,6 +3,9 @@
+ #elif __GLASGOW_HASKELL__ >= 703
+ {-# LANGUAGE Trustworthy #-}
+ #endif
++#if __GLASGOW_HASKELL__
++{-# LANGUAGE CApiFFI #-}
++#endif
+ -----------------------------------------------------------------------------
+ -- |
+ -- Module      :  System.Posix.Env
+@@ -142,7 +145,7 @@ putEnv keyvalue = do s <- newFilePath keyvalue
+       newFilePath fp = getFileSystemEncoding >>= \enc -> GHC.newCString enc fp
+ #endif
+ 
+-foreign import ccall unsafe "putenv"
++foreign import capi unsafe "stdlib.h putenv"
+    c_putenv :: CString -> IO CInt
+ 
+ {- |The 'setEnv' function inserts or resets the environment variable name in
+diff --git a/libraries/unix/System/Posix/Env/ByteString.hsc b/libraries/unix/System/Posix/Env/ByteString.hsc
+index 9217525..654fa4e 100644
+--- a/libraries/unix/System/Posix/Env/ByteString.hsc
++++ b/libraries/unix/System/Posix/Env/ByteString.hsc
+@@ -2,6 +2,7 @@
+ {-# LANGUAGE Trustworthy #-}
+ #if __GLASGOW_HASKELL__ >= 709
+ {-# OPTIONS_GHC -fno-warn-trustworthy-safe #-}
++{-# LANGUAGE CApiFFI #-}
+ #endif
+ #endif
+ 
+@@ -118,7 +119,7 @@ putEnv :: ByteString -> IO ()
+ putEnv keyvalue = B.useAsCString keyvalue $ \s ->
+   throwErrnoIfMinus1_ "putenv" (c_putenv s)
+ 
+-foreign import ccall unsafe "putenv"
++foreign import capi unsafe "stdlib.h putenv"
+    c_putenv :: CString -> IO CInt
+ 
+ {- |The 'setEnv' function inserts or resets the environment variable name in
+diff --git a/libraries/unix/System/Posix/Files/Common.hsc b/libraries/unix/System/Posix/Files/Common.hsc
+index 586b417..dc22a59 100644
+--- a/libraries/unix/System/Posix/Files/Common.hsc
++++ b/libraries/unix/System/Posix/Files/Common.hsc
+@@ -1,5 +1,6 @@
+ #ifdef __GLASGOW_HASKELL__
+ {-# LANGUAGE Trustworthy #-}
++{-# LANGUAGE CApiFFI #-}
+ #endif
+ -----------------------------------------------------------------------------
+ -- |
+@@ -456,16 +457,16 @@ toCTimeVal t = CTimeVal sec (truncate $ 10^(6::Int) * frac)
+     (sec, frac) = if (frac' < 0) then (sec' - 1, frac' + 1) else (sec', frac')
+     (sec', frac') = properFraction $ toRational t
+ 
+-foreign import ccall unsafe "utimes"
++foreign import capi unsafe "sys/time.h utimes"
+     c_utimes :: CString -> Ptr CTimeVal -> IO CInt
+ 
+ #ifdef HAVE_LUTIMES
+-foreign import ccall unsafe "lutimes"
++foreign import capi unsafe "sys/time.h lutimes"
+     c_lutimes :: CString -> Ptr CTimeVal -> IO CInt
+ #endif
+ 
+ #if HAVE_FUTIMES
+-foreign import ccall unsafe "futimes"
++foreign import capi unsafe "sys/time.h futimes"
+     c_futimes :: CInt -> Ptr CTimeVal -> IO CInt
+ #endif
+ 
+diff --git a/libraries/unix/System/Posix/Signals.hsc b/libraries/unix/System/Posix/Signals.hsc
+index d4c6d51..439c526 100644
+--- a/libraries/unix/System/Posix/Signals.hsc
++++ b/libraries/unix/System/Posix/Signals.hsc
+@@ -603,8 +603,13 @@ awaitSignal maybe_sigset = do
+   -- XXX My manpage says it can also return EFAULT. And why is ignoring
+   -- EINTR the right thing to do?
+ 
++#ifdef __HUGS__
+ foreign import ccall unsafe "sigsuspend"
+   c_sigsuspend :: Ptr CSigset -> IO CInt
++#else
++foreign import capi unsafe "signal.h sigsuspend"
++  c_sigsuspend :: Ptr CSigset -> IO CInt
++#endif
+ #endif
+ 
+ #ifdef __HUGS__
+@@ -627,6 +632,9 @@ foreign import ccall unsafe "__hscore_sigfillset"
+ 
+ foreign import ccall unsafe "__hscore_sigismember"
+   c_sigismember :: Ptr CSigset -> CInt -> IO CInt
++
++foreign import ccall unsafe "sigpending"
++  c_sigpending :: Ptr CSigset -> IO CInt
+ #else
+ foreign import capi unsafe "signal.h sigdelset"
+   c_sigdelset   :: Ptr CSigset -> CInt -> IO CInt
+@@ -636,7 +644,8 @@ foreign import capi unsafe "signal.h sigfillset"
+ 
+ foreign import capi unsafe "signal.h sigismember"
+   c_sigismember :: Ptr CSigset -> CInt -> IO CInt
+-#endif /* __HUGS__ */
+ 
+-foreign import ccall unsafe "sigpending"
++foreign import capi unsafe "signal.h sigpending"
+   c_sigpending :: Ptr CSigset -> IO CInt
++
++#endif /* __HUGS__ */
+diff --git a/mk/config.mk.in b/mk/config.mk.in
+index 42720c8..799defd 100644
+--- a/mk/config.mk.in
++++ b/mk/config.mk.in
+@@ -702,7 +702,7 @@ GZIP_CMD       = gzip
+ XZ_CMD         = xz -9e
+ 
+ # bzip2 is default compression
+-TAR_COMP      = bzip2
++TAR_COMP      = xz
+ 
+ # select compression command and .tar extension based on TAR_COMP value
+ ifeq "$(TAR_COMP)" "bzip2"
+diff --git a/rts/posix/OSThreads.c b/rts/posix/OSThreads.c
+index 8c1beda..263b4d8 100644
+--- a/rts/posix/OSThreads.c
++++ b/rts/posix/OSThreads.c
+@@ -20,6 +20,9 @@
+  * because of some specific types, like u_char, u_int, etc. */
+ #define __BSD_VISIBLE   1
+ #endif
++#if defined(netbsd_HOST_OS)
++#define _NETBSD_SOURCE	1
++#endif
+ 
+ #include "Rts.h"
+ 
+@@ -44,7 +47,7 @@
+ #include <string.h>
+ #endif
+ 
+-#if defined(darwin_HOST_OS) || defined(freebsd_HOST_OS)
++#if defined(darwin_HOST_OS) || defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS)
+ #include <sys/types.h>
+ #include <sys/sysctl.h>
+ #endif
+@@ -243,7 +246,7 @@ getNumberOfProcessors (void)
+         nproc = sysconf(_SC_NPROCESSORS_ONLN);
+ #elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_CONF)
+         nproc = sysconf(_SC_NPROCESSORS_CONF);
+-#elif defined(darwin_HOST_OS) || defined(freebsd_HOST_OS)
++#elif defined(darwin_HOST_OS) || defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS)
+         size_t size = sizeof(nat);
+         if(0 != sysctlbyname("hw.ncpu",&nproc,&size,NULL,0))
+             nproc = 1;
+diff --git a/rules/shell-wrapper.mk b/rules/shell-wrapper.mk
+index 05dd0ef..ab9841e 100644
+--- a/rules/shell-wrapper.mk
++++ b/rules/shell-wrapper.mk
+@@ -103,7 +103,7 @@ $$($1_$2_BINDIST_WRAPPER): $1/$2/build/tmp/$$($1_$2_PROG)
+ ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
+ 	echo '$$(call prependLibraryPath,$$($1_$2_DEP_LIB_REL_DIRS_SEARCHPATH))' >> $$@
+ endif
+-	echo 'exec "$$<" $$$${1+"$$$$@"}'                                  >> $$@
++	echo 'exec "$$$$PWD/$$<" $$$${1+"$$$$@"}'                                  >> $$@
+ 	$$(EXECUTABLE_FILE)                                                   $$@
+ 
+ endif
+-- 
+2.3.2
+
