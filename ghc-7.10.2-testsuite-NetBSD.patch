@@ -1,0 +1,25 @@
+From da30750dd7621604e48211162866455816e0b903 Mon Sep 17 00:00:00 2001
+From: Iku Iwasa <iku.iwasa@gmail.com>
+Date: Tue, 22 Sep 2015 18:28:24 +0900
+Subject: [PATCH] Adapt to NetBSD
+
+---
+ tests/dynlibs/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tests/dynlibs/Makefile b/tests/dynlibs/Makefile
+index 2f5620c..5f3101f 100644
+--- a/tests/dynlibs/Makefile
++++ b/tests/dynlibs/Makefile
+@@ -10,7 +10,7 @@ T3807:
+ 	$(RM) T3807test.so
+ 	$(RM) T3807-load
+ 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 --make -dynamic -fPIC -shared T3807Export.hs T3807-export.c -o T3807test.so -lHSrts-ghc`'$(TEST_HC)' $(TEST_HC_OPTS) --numeric-version`
+-	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -no-auto-link-packages -no-hs-main T3807-load.c -o T3807-load -ldl
++	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -no-auto-link-packages -no-hs-main T3807-load.c -o T3807-load
+ 	./T3807-load
+ 
+ .PHONY: T4464dyn
+-- 
+2.5.2
+

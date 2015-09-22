@@ -1,13 +1,16 @@
-From 0d8901a43e176aed6e973c7852c60bd5257ed005 Mon Sep 17 00:00:00 2001
+From a7f902450a2d9c572b2cf118a95a14698c897b8a Mon Sep 17 00:00:00 2001
 From: Iku Iwasa <iku.iwasa@gmail.com>
-Date: Sun, 29 Mar 2015 10:00:06 +0900
+Date: Tue, 22 Sep 2015 17:53:34 +0900
 Subject: [PATCH] Adapt to NetBSD
 
 ---
  libraries/base/GHC/Event/KQueue.hsc                |  2 +-
  libraries/base/System/Environment.hs               |  3 +-
  libraries/base/include/EventConfig.h.in            |  6 ++++
+ .../getPermissions001.stdout-i386-unknown-netbsd   |  3 ++
+ .../getPermissions001.stdout-x86_64-unknown-netbsd |  3 ++
  .../Console/Haskeline/Backend/Posix/IConv.hsc      |  2 +-
+ libraries/process/tests/process011.hs              | 14 +++++---
  libraries/time/configure.ac                        |  5 +++
  libraries/time/lib/Data/Time/Clock/CTimeval.hs     | 38 ++++++++++++++++++----
  libraries/time/time.cabal                          |  1 +
@@ -18,7 +21,9 @@ Subject: [PATCH] Adapt to NetBSD
  mk/config.mk.in                                    |  2 +-
  rts/posix/OSThreads.c                              |  7 ++--
  rules/shell-wrapper.mk                             |  2 +-
- 14 files changed, 75 insertions(+), 21 deletions(-)
+ 17 files changed, 90 insertions(+), 26 deletions(-)
+ create mode 100644 libraries/directory/tests/getPermissions001.stdout-i386-unknown-netbsd
+ create mode 100644 libraries/directory/tests/getPermissions001.stdout-x86_64-unknown-netbsd
 
 diff --git a/libraries/base/GHC/Event/KQueue.hsc b/libraries/base/GHC/Event/KQueue.hsc
 index 2b8d443..e909d09 100644
@@ -67,6 +72,24 @@ index 061b6ac..6438f44 100644
 +
 +/* The size of `kev.flags', as computed by sizeof. */
 +#undef SIZEOF_KEV_FLAGS
+diff --git a/libraries/directory/tests/getPermissions001.stdout-i386-unknown-netbsd b/libraries/directory/tests/getPermissions001.stdout-i386-unknown-netbsd
+new file mode 100644
+index 0000000..8b030e2
+--- /dev/null
++++ b/libraries/directory/tests/getPermissions001.stdout-i386-unknown-netbsd
+@@ -0,0 +1,3 @@
++Permissions {readable = True, writable = True, executable = False, searchable = True}
++Permissions {readable = True, writable = True, executable = False, searchable = False}
++Permissions {readable = True, writable = False, executable = True, searchable = False}
+diff --git a/libraries/directory/tests/getPermissions001.stdout-x86_64-unknown-netbsd b/libraries/directory/tests/getPermissions001.stdout-x86_64-unknown-netbsd
+new file mode 100644
+index 0000000..8b030e2
+--- /dev/null
++++ b/libraries/directory/tests/getPermissions001.stdout-x86_64-unknown-netbsd
+@@ -0,0 +1,3 @@
++Permissions {readable = True, writable = True, executable = False, searchable = True}
++Permissions {readable = True, writable = True, executable = False, searchable = False}
++Permissions {readable = True, writable = False, executable = True, searchable = False}
 diff --git a/libraries/haskeline/System/Console/Haskeline/Backend/Posix/IConv.hsc b/libraries/haskeline/System/Console/Haskeline/Backend/Posix/IConv.hsc
 index 56691cb..3f920fc 100644
 --- a/libraries/haskeline/System/Console/Haskeline/Backend/Posix/IConv.hsc
@@ -80,6 +103,66 @@ index 56691cb..3f920fc 100644
  
  setLocale :: Maybe String -> IO (Maybe String)
  setLocale oldLocale = (maybeWith withCAString) oldLocale $ \loc_p -> do
+diff --git a/libraries/process/tests/process011.hs b/libraries/process/tests/process011.hs
+index fdcb8cf..87530c2 100644
+--- a/libraries/process/tests/process011.hs
++++ b/libraries/process/tests/process011.hs
+@@ -6,6 +6,10 @@ import Data.List
+ 
+ -- Test control-C delegation (#2301)
+ 
++bashShell :: String -> CreateProcess
++bashShell script = (shell script)
++    { cmdspec = RawCommand "/usr/pkg/bin/bash" ["-c", script] }
++
+ main :: IO ()
+ main = do
+   hSetBuffering stdout LineBuffering
+@@ -17,7 +21,7 @@ main = do
+   do let script = intercalate "; "
+                     [ "kill -INT $$"
+                     , "exit 42" ]
+-     (_,_,_,p) <- createProcess (shell script) { delegate_ctlc = False }
++     (_,_,_,p) <- createProcess (bashShell script) { delegate_ctlc = False }
+      waitForProcess p >>= print
+ 
+   putStrLn "===================== test 2"
+@@ -27,7 +31,7 @@ main = do
+   do let script = intercalate "; "
+                     [ "kill -INT $$"
+                     , "exit 42" ]
+-     (_,_,_,p) <- createProcess (shell script) { delegate_ctlc = True }
++     (_,_,_,p) <- createProcess (bashShell script) { delegate_ctlc = True }
+      (waitForProcess p >>= print)
+        `catchUserInterrupt` \e -> putStrLn $ "caught: " ++ show e
+ 
+@@ -39,7 +43,7 @@ main = do
+                     [ "trap 'echo shell trapped SIGINT' INT"
+                     , "kill -INT $$"
+                     , "exit 42" ]
+-     (_,_,_,p) <- createProcess (shell script) { delegate_ctlc = True }
++     (_,_,_,p) <- createProcess (bashShell script) { delegate_ctlc = True }
+      waitForProcess p >>= print
+ 
+   putStrLn "===================== test 4"
+@@ -51,7 +55,7 @@ main = do
+                     [ "kill -INT $PPID"
+                     , "kill -INT $PPID"
+                     , "exit 42" ]
+-     (_,_,_,p) <- createProcess (shell script) { delegate_ctlc = True }
++     (_,_,_,p) <- createProcess (bashShell script) { delegate_ctlc = True }
+      waitForProcess p >>= print
+ 
+   putStrLn "===================== test 5"
+@@ -61,7 +65,7 @@ main = do
+   do let script = intercalate "; "
+                     [ "kill -INT $PPID"
+                     , "exit 42" ]
+-     (_,_,_,p) <- createProcess (shell script) { delegate_ctlc = False }
++     (_,_,_,p) <- createProcess (bashShell script) { delegate_ctlc = False }
+      exit <- waitForProcess p
+      -- need to allow for the async exception to arrive
+      threadDelay 1000000
 diff --git a/libraries/time/configure.ac b/libraries/time/configure.ac
 index 2b2149a..132e6a0 100644
 --- a/libraries/time/configure.ac
@@ -279,7 +362,7 @@ index d4c6d51..439c526 100644
 +
 +#endif /* __HUGS__ */
 diff --git a/mk/config.mk.in b/mk/config.mk.in
-index 42720c8..799defd 100644
+index 10539ae..aa6ffe5 100644
 --- a/mk/config.mk.in
 +++ b/mk/config.mk.in
 @@ -702,7 +702,7 @@ GZIP_CMD       = gzip
@@ -337,5 +420,5 @@ index 05dd0ef..ab9841e 100644
  
  endif
 -- 
-2.3.2
+2.5.2
 

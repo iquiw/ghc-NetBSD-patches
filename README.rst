@@ -54,7 +54,9 @@ How to use?
 
    For example::
 
-   $ ./configure --prefix=/usr/local/ghc-x.x.x --with-gmp-includes=/usr/pkg/include --with-gmp-libraries=/usr/pkg/lib
+   $ ./configure --prefix=/opt/ghc-x.x.x \
+       --with-gmp-includes=/usr/pkg/include --with-gmp-libraries=/usr/pkg/lib \
+       --with-libiconv-includes=/usr/pkg/include --with-libiconv-libraries=/usr/pkg/lib
 
 -----------------
 Supported version
@@ -77,5 +79,5 @@ ghc-7.6.2.NetBSD.patch
 ghc-7.8.3.NetBSD.patch
    ghc-7.8.2, ghc-7.8.3
 
-ghc-7.10.1.NetBSD.patch
-   ghc-7.10.1
+ghc-7.10.2.NetBSD.patch
+   ghc-7.10.1, ghc-7.10.2
