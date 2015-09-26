@@ -56,7 +56,7 @@ How to use?
 
      $ ./configure --prefix=/opt/ghc-x.x.x \
        --with-gmp-includes=/usr/pkg/include --with-gmp-libraries=/usr/pkg/lib \
-       --with-libiconv-includes=/usr/pkg/include --with-libiconv-libraries=/usr/pkg/lib
+       --with-iconv-includes=/usr/pkg/include --with-iconv-libraries=/usr/pkg/lib
 
 -----------------
 Supported version
