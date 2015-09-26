@@ -54,7 +54,7 @@ How to use?
 
    For example::
 
-   $ ./configure --prefix=/opt/ghc-x.x.x \
+     $ ./configure --prefix=/opt/ghc-x.x.x \
        --with-gmp-includes=/usr/pkg/include --with-gmp-libraries=/usr/pkg/lib \
        --with-libiconv-includes=/usr/pkg/include --with-libiconv-libraries=/usr/pkg/lib
 
