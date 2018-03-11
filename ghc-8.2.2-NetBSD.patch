@@ -1,6 +1,6 @@
-From 2f384f4398808f673059c8316c554a4e89ad80a5 Mon Sep 17 00:00:00 2001
+From 49968fb3dd4a4911d02952d8b604d49da0bed94b Mon Sep 17 00:00:00 2001
 From: Iku Iwasa <iku.iwasa@gmail.com>
-Date: Sat, 5 Aug 2017 12:05:27 +0900
+Date: Sat, 3 Mar 2018 13:55:53 +0900
 Subject: [PATCH] Adapt to NetBSD
 
 ---
@@ -427,5 +427,5 @@ index eb7d8f1..1bbe63d 100644
  
  endif
 -- 
-2.13.4
+2.16.2
 
