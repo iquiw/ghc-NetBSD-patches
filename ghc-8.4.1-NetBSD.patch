@@ -1,0 +1,462 @@
+From 2ae24441ee6f09fcbbb6f7f5b9c390b267cb6d48 Mon Sep 17 00:00:00 2001
+From: Iku Iwasa <iku.iwasa@gmail.com>
+Date: Sun, 11 Mar 2018 20:46:45 +0900
+Subject: [PATCH] Adapt to NetBSD
+
+---
+ aclocal.m4                                         |  3 +++
+ libraries/base/GHC/Event/KQueue.hsc                |  2 +-
+ libraries/base/System/CPUTime/Posix/Times.hsc      |  2 +-
+ libraries/base/System/Environment.hs               |  3 ++-
+ libraries/base/include/EventConfig.h.in            |  6 ++++++
+ libraries/time/configure.ac                        |  3 +++
+ .../lib/Data/Time/Clock/Internal/CTimespec.hsc     |  4 ++--
+ .../time/lib/Data/Time/Clock/Internal/CTimeval.hs  | 25 ++++++++++++++++------
+ libraries/time/time.cabal                          |  1 +
+ libraries/unix/System/Posix/Env.hsc                |  3 ++-
+ libraries/unix/System/Posix/Env/ByteString.hsc     |  3 ++-
+ libraries/unix/System/Posix/Files.hsc              |  6 +++---
+ libraries/unix/System/Posix/Files/ByteString.hsc   |  6 +++---
+ libraries/unix/System/Posix/Files/Common.hsc       | 10 +++++----
+ libraries/unix/System/Posix/Signals.hsc            | 16 +++++++++-----
+ libraries/unix/System/Posix/User.hsc               |  4 ++--
+ rts/posix/OSThreads.c                              |  7 ++++--
+ rules/build-prog.mk                                |  4 ++++
+ rules/shell-wrapper.mk                             |  2 +-
+ 19 files changed, 76 insertions(+), 34 deletions(-)
+
+diff --git a/aclocal.m4 b/aclocal.m4
+index c02c1d1..d1823af 100644
+--- a/aclocal.m4
++++ b/aclocal.m4
+@@ -1990,6 +1990,9 @@ AC_DEFUN([GHC_CONVERT_OS],[
+                 #      i686-gentoo-freebsd8.2
+         $3="freebsd"
+         ;;
++      netbsd*)
++        $3="netbsd"
++        ;;
+       nto-qnx*)
+         $3="nto-qnx"
+         ;;
+diff --git a/libraries/base/GHC/Event/KQueue.hsc b/libraries/base/GHC/Event/KQueue.hsc
+index 59b5ce1..1f87aaa 100644
+--- a/libraries/base/GHC/Event/KQueue.hsc
++++ b/libraries/base/GHC/Event/KQueue.hsc
+@@ -283,7 +283,7 @@ foreign import capi safe "sys/event.h kevent"
+     c_kevent :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
+              -> Ptr TimeSpec -> IO CInt
+ 
+-foreign import ccall unsafe "kevent"
++foreign import capi unsafe "sys/event.h kevent"
+     c_kevent_unsafe :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
+                     -> Ptr TimeSpec -> IO CInt
+ #else
+diff --git a/libraries/base/System/CPUTime/Posix/Times.hsc b/libraries/base/System/CPUTime/Posix/Times.hsc
+index c703863..685c8c7 100644
+--- a/libraries/base/System/CPUTime/Posix/Times.hsc
++++ b/libraries/base/System/CPUTime/Posix/Times.hsc
+@@ -27,7 +27,7 @@ getCPUTime = allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
+                         `div` fromIntegral clockTicks)
+ 
+ type CTms = ()
+-foreign import ccall unsafe times :: Ptr CTms -> IO CClock
++foreign import capi unsafe times :: Ptr CTms -> IO CClock
+ 
+ getCpuTimePrecision :: IO Integer
+ getCpuTimePrecision =
+diff --git a/libraries/base/System/Environment.hs b/libraries/base/System/Environment.hs
+index 5604ca2..1896acf 100644
+--- a/libraries/base/System/Environment.hs
++++ b/libraries/base/System/Environment.hs
+@@ -1,5 +1,6 @@
+ {-# LANGUAGE Safe #-}
+ {-# LANGUAGE CPP #-}
++{-# LANGUAGE CApiFFI #-}
+ 
+ -----------------------------------------------------------------------------
+ -- |
+@@ -246,7 +247,7 @@ putEnv keyvalue = do
+   -- environment.
+   throwErrnoIf_ (/= 0) "putenv" (c_putenv s)
+ 
+-foreign import ccall unsafe "putenv" c_putenv :: CString -> IO CInt
++foreign import capi unsafe "stdlib.h putenv" c_putenv :: CString -> IO CInt
+ #endif
+ 
+ -- | @unsetEnv name@ removes the specified environment variable from the
+diff --git a/libraries/base/include/EventConfig.h.in b/libraries/base/include/EventConfig.h.in
+index 061b6ac..6438f44 100644
+--- a/libraries/base/include/EventConfig.h.in
++++ b/libraries/base/include/EventConfig.h.in
+@@ -89,3 +89,9 @@
+ 
+ /* The size of `kev.flags', as computed by sizeof. */
+ #undef SIZEOF_KEV_FLAGS
++
++/* The size of `kev.filter', as computed by sizeof. */
++#undef SIZEOF_KEV_FILTER
++
++/* The size of `kev.flags', as computed by sizeof. */
++#undef SIZEOF_KEV_FLAGS
+diff --git a/libraries/time/configure.ac b/libraries/time/configure.ac
+index f415bfc..05f5062 100644
+--- a/libraries/time/configure.ac
++++ b/libraries/time/configure.ac
+@@ -15,6 +15,9 @@ AC_CONFIG_HEADERS([lib/include/HsTimeConfig.h])
+ 
+ AC_CHECK_HEADERS([time.h])
+ AC_CHECK_FUNCS([gmtime_r localtime_r])
++AC_CHECK_SIZEOF([suseconds_t])
++AC_CHECK_SIZEOF([int])
++AC_CHECK_SIZEOF([long])
+ 
+ AC_CHECK_FUNCS([clock_gettime])
+ 
+diff --git a/libraries/time/lib/Data/Time/Clock/Internal/CTimespec.hsc b/libraries/time/lib/Data/Time/Clock/Internal/CTimespec.hsc
+index 38197a4..8dc22f9 100644
+--- a/libraries/time/lib/Data/Time/Clock/Internal/CTimespec.hsc
++++ b/libraries/time/lib/Data/Time/Clock/Internal/CTimespec.hsc
+@@ -29,9 +29,9 @@ instance Storable CTimespec where
+         #{poke struct timespec, tv_sec } p s
+         #{poke struct timespec, tv_nsec} p ns
+ 
+-foreign import ccall unsafe "time.h clock_gettime"
++foreign import capi unsafe "time.h clock_gettime"
+     clock_gettime :: ClockID -> Ptr CTimespec -> IO CInt
+-foreign import ccall unsafe "time.h clock_getres"
++foreign import capi unsafe "time.h clock_getres"
+     clock_getres :: ClockID -> Ptr CTimespec -> IO CInt
+ 
+ -- | Get the resolution of the given clock.
+diff --git a/libraries/time/lib/Data/Time/Clock/Internal/CTimeval.hs b/libraries/time/lib/Data/Time/Clock/Internal/CTimeval.hs
+index cf8f2b2..9b19e36 100644
+--- a/libraries/time/lib/Data/Time/Clock/Internal/CTimeval.hs
++++ b/libraries/time/lib/Data/Time/Clock/Internal/CTimeval.hs
+@@ -10,20 +10,31 @@ import Foreign.Safe
+ #endif
+ import Foreign.C
+ 
+-data CTimeval = MkCTimeval CLong CLong
++#include "HsTimeConfig.h"
++
++--
++-- we assume suseconds_t are either long or int.
++--
++#if defined(SIZEOF_SUSECONDS_T) && SIZEOF_SUSECONDS_T == SIZEOF_INT
++type SusecondsT = CInt
++#else
++type SusecondsT = CLong
++#endif
++
++data CTimeval = MkCTimeval CTime SusecondsT
+ 
+ instance Storable CTimeval where
+-    sizeOf _ = (sizeOf (undefined :: CLong)) * 2
++    sizeOf _ = sizeOf (undefined :: CTime) + sizeOf (undefined :: SusecondsT)
+     alignment _ = alignment (undefined :: CLong)
+     peek p = do
+-        s   <- peekElemOff (castPtr p) 0
+-        mus <- peekElemOff (castPtr p) 1
++        s   <- peekByteOff p 0
++        mus <- peekByteOff p (sizeOf (undefined :: CTime))
+         return (MkCTimeval s mus)
+     poke p (MkCTimeval s mus) = do
+-        pokeElemOff (castPtr p) 0 s
+-        pokeElemOff (castPtr p) 1 mus
++        pokeByteOff p 0 s
++        pokeByteOff p (sizeOf (undefined :: CTime)) mus
+ 
+-foreign import ccall unsafe "time.h gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
++foreign import capi unsafe "time.h gettimeofday" gettimeofday :: Ptr CTimeval -> Ptr () -> IO CInt
+ 
+ -- | Get the current POSIX time from the system clock.
+ getCTimeval :: IO CTimeval
+diff --git a/libraries/time/time.cabal b/libraries/time/time.cabal
+index d1934fc..ff2b03f 100644
+--- a/libraries/time/time.cabal
++++ b/libraries/time/time.cabal
+@@ -43,6 +43,7 @@ library
+             Rank2Types
+             DeriveDataTypeable
+             StandaloneDeriving
++            CApiFFI
+         cpp-options: -DLANGUAGE_Rank2Types -DLANGUAGE_DeriveDataTypeable -DLANGUAGE_StandaloneDeriving
+     else
+         if impl(hugs)
+diff --git a/libraries/unix/System/Posix/Env.hsc b/libraries/unix/System/Posix/Env.hsc
+index 2e052ad..fbdd8d9 100644
+--- a/libraries/unix/System/Posix/Env.hsc
++++ b/libraries/unix/System/Posix/Env.hsc
+@@ -4,6 +4,7 @@
+ #else
+ {-# LANGUAGE Trustworthy #-}
+ #endif
++{-# LANGUAGE CApiFFI #-}
+ -----------------------------------------------------------------------------
+ -- |
+ -- Module      :  System.Posix.Env
+@@ -156,7 +157,7 @@ putEnv keyvalue = do s <- newFilePath keyvalue
+       newFilePath fp = getFileSystemEncoding >>= \enc -> GHC.newCString enc fp
+ #endif
+ 
+-foreign import ccall unsafe "putenv"
++foreign import capi unsafe "stdlib.h putenv"
+    c_putenv :: CString -> IO CInt
+ 
+ {- |The 'setEnv' function inserts or resets the environment variable name in
+diff --git a/libraries/unix/System/Posix/Env/ByteString.hsc b/libraries/unix/System/Posix/Env/ByteString.hsc
+index 3ce867b..9fcf43f 100644
+--- a/libraries/unix/System/Posix/Env/ByteString.hsc
++++ b/libraries/unix/System/Posix/Env/ByteString.hsc
+@@ -2,6 +2,7 @@
+ {-# LANGUAGE Trustworthy #-}
+ #if __GLASGOW_HASKELL__ >= 709
+ {-# OPTIONS_GHC -fno-warn-trustworthy-safe #-}
++{-# LANGUAGE CApiFFI #-}
+ #endif
+ 
+ -----------------------------------------------------------------------------
+@@ -130,7 +131,7 @@ putEnv :: ByteString {- ^ "key=value" -} -> IO ()
+ putEnv keyvalue = B.useAsCString keyvalue $ \s ->
+   throwErrnoIfMinus1_ "putenv" (c_putenv s)
+ 
+-foreign import ccall unsafe "putenv"
++foreign import capi unsafe "stdlib.h putenv"
+    c_putenv :: CString -> IO CInt
+ 
+ {- |The 'setEnv' function inserts or resets the environment variable name in
+diff --git a/libraries/unix/System/Posix/Files.hsc b/libraries/unix/System/Posix/Files.hsc
+index 749f5da..367ec73 100644
+--- a/libraries/unix/System/Posix/Files.hsc
++++ b/libraries/unix/System/Posix/Files.hsc
+@@ -293,7 +293,7 @@ rename name1 name2 =
+   withFilePath name2 $ \s2 ->
+   throwErrnoPathIfMinus1_ "rename" name1 (c_rename s1 s2)
+ 
+-foreign import ccall unsafe "rename"
++foreign import capi unsafe "rename"
+    c_rename :: CString -> CString -> IO CInt
+ 
+ -- -----------------------------------------------------------------------------
+@@ -310,7 +310,7 @@ setOwnerAndGroup name uid gid = do
+   withFilePath name $ \s ->
+     throwErrnoPathIfMinus1_ "setOwnerAndGroup" name (c_chown s uid gid)
+ 
+-foreign import ccall unsafe "chown"
++foreign import capi unsafe "chown"
+   c_chown :: CString -> CUid -> CGid -> IO CInt
+ 
+ #if HAVE_LCHOWN
+@@ -324,7 +324,7 @@ setSymbolicLinkOwnerAndGroup name uid gid = do
+     throwErrnoPathIfMinus1_ "setSymbolicLinkOwnerAndGroup" name
+         (c_lchown s uid gid)
+ 
+-foreign import ccall unsafe "lchown"
++foreign import capi unsafe "lchown"
+   c_lchown :: CString -> CUid -> CGid -> IO CInt
+ #endif
+ 
+diff --git a/libraries/unix/System/Posix/Files/ByteString.hsc b/libraries/unix/System/Posix/Files/ByteString.hsc
+index 23a44e3..13af909 100644
+--- a/libraries/unix/System/Posix/Files/ByteString.hsc
++++ b/libraries/unix/System/Posix/Files/ByteString.hsc
+@@ -299,7 +299,7 @@ rename name1 name2 =
+   withFilePath name2 $ \s2 ->
+   throwErrnoPathIfMinus1_ "rename" name1 (c_rename s1 s2)
+ 
+-foreign import ccall unsafe "rename"
++foreign import capi unsafe "rename"
+    c_rename :: CString -> CString -> IO CInt
+ 
+ -- -----------------------------------------------------------------------------
+@@ -316,7 +316,7 @@ setOwnerAndGroup name uid gid = do
+   withFilePath name $ \s ->
+     throwErrnoPathIfMinus1_ "setOwnerAndGroup" name (c_chown s uid gid)
+ 
+-foreign import ccall unsafe "chown"
++foreign import capi unsafe "chown"
+   c_chown :: CString -> CUid -> CGid -> IO CInt
+ 
+ #if HAVE_LCHOWN
+@@ -330,7 +330,7 @@ setSymbolicLinkOwnerAndGroup name uid gid = do
+     throwErrnoPathIfMinus1_ "setSymbolicLinkOwnerAndGroup" name
+         (c_lchown s uid gid)
+ 
+-foreign import ccall unsafe "lchown"
++foreign import capi unsafe "lchown"
+   c_lchown :: CString -> CUid -> CGid -> IO CInt
+ #endif
+ 
+diff --git a/libraries/unix/System/Posix/Files/Common.hsc b/libraries/unix/System/Posix/Files/Common.hsc
+index cc594cc..c955cc1 100644
+--- a/libraries/unix/System/Posix/Files/Common.hsc
++++ b/libraries/unix/System/Posix/Files/Common.hsc
+@@ -1,4 +1,5 @@
+ {-# LANGUAGE Trustworthy #-}
++{-# LANGUAGE CApiFFI #-}
+ 
+ -----------------------------------------------------------------------------
+ -- |
+@@ -70,6 +71,7 @@ module System.Posix.Files.Common (
+     CTimeSpec(..),
+     toCTimeSpec,
+     c_utimensat,
++{-# LANGUAGE CApiFFI #-}
+ #endif
+     CTimeVal(..),
+     toCTimeVal,
+@@ -448,16 +450,16 @@ toCTimeVal t = CTimeVal sec (truncate $ 10^(6::Int) * frac)
+     (sec, frac) = if (frac' < 0) then (sec' - 1, frac' + 1) else (sec', frac')
+     (sec', frac') = properFraction $ toRational t
+ 
+-foreign import ccall unsafe "utimes"
++foreign import capi unsafe "sys/time.h utimes"
+     c_utimes :: CString -> Ptr CTimeVal -> IO CInt
+ 
+ #ifdef HAVE_LUTIMES
+-foreign import ccall unsafe "lutimes"
++foreign import capi unsafe "sys/time.h lutimes"
+     c_lutimes :: CString -> Ptr CTimeVal -> IO CInt
+ #endif
+ 
+ #if HAVE_FUTIMES
+-foreign import ccall unsafe "futimes"
++foreign import capi unsafe "sys/time.h futimes"
+     c_futimes :: CInt -> Ptr CTimeVal -> IO CInt
+ #endif
+ 
+@@ -509,7 +511,7 @@ setFdOwnerAndGroup :: Fd -> UserID -> GroupID -> IO ()
+ setFdOwnerAndGroup (Fd fd) uid gid =
+   throwErrnoIfMinus1_ "setFdOwnerAndGroup" (c_fchown fd uid gid)
+ 
+-foreign import ccall unsafe "fchown"
++foreign import capi unsafe "fchown"
+   c_fchown :: CInt -> CUid -> CGid -> IO CInt
+ 
+ -- -----------------------------------------------------------------------------
+diff --git a/libraries/unix/System/Posix/Signals.hsc b/libraries/unix/System/Posix/Signals.hsc
+index f26765d..517f436 100644
+--- a/libraries/unix/System/Posix/Signals.hsc
++++ b/libraries/unix/System/Posix/Signals.hsc
+@@ -590,9 +590,6 @@ awaitSignal maybe_sigset = do
+   -- XXX My manpage says it can also return EFAULT. And why is ignoring
+   -- EINTR the right thing to do?
+ 
+-foreign import ccall unsafe "sigsuspend"
+-  c_sigsuspend :: Ptr CSigset -> IO CInt
+-
+ #if defined(darwin_HOST_OS) && __GLASGOW_HASKELL__ < 706
+ -- see http://ghc.haskell.org/trac/ghc/ticket/7359#comment:3
+ -- To be removed when support for GHC 7.4.x is dropped
+@@ -604,6 +601,12 @@ foreign import ccall unsafe "__hscore_sigfillset"
+ 
+ foreign import ccall unsafe "__hscore_sigismember"
+   c_sigismember :: Ptr CSigset -> CInt -> IO CInt
++
++foreign import ccall unsafe "sigsuspend"
++  c_sigsuspend :: Ptr CSigset -> IO CInt
++
++foreign import ccall unsafe "sigpending"
++  c_sigpending :: Ptr CSigset -> IO CInt
+ #else
+ foreign import capi unsafe "signal.h sigdelset"
+   c_sigdelset   :: Ptr CSigset -> CInt -> IO CInt
+@@ -613,7 +616,10 @@ foreign import capi unsafe "signal.h sigfillset"
+ 
+ foreign import capi unsafe "signal.h sigismember"
+   c_sigismember :: Ptr CSigset -> CInt -> IO CInt
+-#endif
+ 
+-foreign import ccall unsafe "sigpending"
++foreign import capi unsafe "signal.h sigsuspend"
++  c_sigsuspend :: Ptr CSigset -> IO CInt
++
++foreign import capi unsafe "signal.h sigpending"
+   c_sigpending :: Ptr CSigset -> IO CInt
++#endif
+diff --git a/libraries/unix/System/Posix/User.hsc b/libraries/unix/System/Posix/User.hsc
+index 63bf466..64d5e14 100644
+--- a/libraries/unix/System/Posix/User.hsc
++++ b/libraries/unix/System/Posix/User.hsc
+@@ -330,7 +330,7 @@ getUserEntryForID uid = do
+     ppw <- throwErrnoIfNull "getUserEntryForID" $ c_getpwuid uid
+     unpackUserEntry ppw
+ 
+-foreign import ccall unsafe "getpwuid"
++foreign import capi unsafe "getpwuid"
+   c_getpwuid :: CUid -> IO (Ptr CPasswd)
+ #else
+ getUserEntryForID = error "System.Posix.User.getUserEntryForID: not supported"
+@@ -358,7 +358,7 @@ getUserEntryForName name = do
+       ppw <- throwErrnoIfNull "getUserEntryForName" $ c_getpwnam pstr
+       unpackUserEntry ppw
+ 
+-foreign import ccall unsafe "getpwnam"
++foreign import capi unsafe "getpwnam"
+   c_getpwnam :: CString -> IO (Ptr CPasswd)
+ #else
+ getUserEntryForName = error "System.Posix.User.getUserEntryForName: not supported"
+diff --git a/rts/posix/OSThreads.c b/rts/posix/OSThreads.c
+index 9cf42aa..be73370 100644
+--- a/rts/posix/OSThreads.c
++++ b/rts/posix/OSThreads.c
+@@ -19,6 +19,9 @@
+  * because of some specific types like u_char, u_int, etc. */
+ #define _DARWIN_C_SOURCE 1
+ #endif
++#if defined(netbsd_HOST_OS)
++#define _NETBSD_SOURCE	1
++#endif
+ 
+ #include "Rts.h"
+ 
+@@ -42,7 +45,7 @@
+ #include <string.h>
+ #endif
+ 
+-#if defined(darwin_HOST_OS) || defined(freebsd_HOST_OS)
++#if defined(darwin_HOST_OS) || defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS)
+ #include <sys/types.h>
+ #include <sys/sysctl.h>
+ #endif
+@@ -256,7 +259,7 @@ getNumberOfProcessors (void)
+             if(sysctlbyname("hw.ncpu",&nproc,&size,NULL,0) != 0)
+                 nproc = 1;
+         }
+-#elif defined(freebsd_HOST_OS)
++#elif defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS)
+         size_t size = sizeof(uint32_t);
+         if(sysctlbyname("hw.ncpu",&nproc,&size,NULL,0) != 0)
+             nproc = 1;
+diff --git a/rules/build-prog.mk b/rules/build-prog.mk
+index 82c55a7..8a33d15 100644
+--- a/rules/build-prog.mk
++++ b/rules/build-prog.mk
+@@ -266,6 +266,10 @@ else # $1_$2_PROG_NEEDS_C_WRAPPER=NO
+ ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
+ $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
+ 	$$(call cmd,$1_$2_HC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
++	case $1/$2 in \
++	ghc/stage2|utils/ghc-cabal/dist-install|utils/ghc-pkg/dist-install|utils/haddock/dist) \
++		paxctl +m $$@ ;; \
++	esac
+ 
+ else
+ $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
+diff --git a/rules/shell-wrapper.mk b/rules/shell-wrapper.mk
+index bdab6e2..233ff3a 100644
+--- a/rules/shell-wrapper.mk
++++ b/rules/shell-wrapper.mk
+@@ -110,7 +110,7 @@ $$($1_$2_BINDIST_WRAPPER): $1/$2/build/tmp/$$($1_$2_PROG)
+ ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
+ 	echo '$$(call prependLibraryPath,$$($1_$2_DEP_LIB_REL_DIRS_SEARCHPATH))' >> $$@
+ endif
+-	echo 'exec "$$<" $$$${1+"$$$$@"}'                                  >> $$@
++	echo 'exec "$$$$PWD/$$<" $$$${1+"$$$$@"}'                                  >> $$@
+ 	$$(EXECUTABLE_FILE)                                                   $$@
+ 
+ endif
+-- 
+2.16.2
+
