@@ -1,35 +1,35 @@
-From 2ae24441ee6f09fcbbb6f7f5b9c390b267cb6d48 Mon Sep 17 00:00:00 2001
+From 17910ea812755fba6be35fb4ae497589f2ada1c2 Mon Sep 17 00:00:00 2001
 From: Iku Iwasa <iku.iwasa@gmail.com>
-Date: Sun, 11 Mar 2018 20:46:45 +0900
+Date: Sat, 11 Aug 2018 18:23:19 +0900
 Subject: [PATCH] Adapt to NetBSD
 
 ---
- aclocal.m4                                         |  3 +++
- libraries/base/GHC/Event/KQueue.hsc                |  2 +-
- libraries/base/System/CPUTime/Posix/Times.hsc      |  2 +-
- libraries/base/System/Environment.hs               |  3 ++-
- libraries/base/include/EventConfig.h.in            |  6 ++++++
- libraries/time/configure.ac                        |  3 +++
- .../lib/Data/Time/Clock/Internal/CTimespec.hsc     |  4 ++--
- .../time/lib/Data/Time/Clock/Internal/CTimeval.hs  | 25 ++++++++++++++++------
- libraries/time/time.cabal                          |  1 +
- libraries/unix/System/Posix/Env.hsc                |  3 ++-
- libraries/unix/System/Posix/Env/ByteString.hsc     |  3 ++-
- libraries/unix/System/Posix/Files.hsc              |  6 +++---
- libraries/unix/System/Posix/Files/ByteString.hsc   |  6 +++---
- libraries/unix/System/Posix/Files/Common.hsc       | 10 +++++----
- libraries/unix/System/Posix/Signals.hsc            | 16 +++++++++-----
- libraries/unix/System/Posix/User.hsc               |  4 ++--
- rts/posix/OSThreads.c                              |  7 ++++--
- rules/build-prog.mk                                |  4 ++++
- rules/shell-wrapper.mk                             |  2 +-
+ aclocal.m4                                    |  3 +++
+ libraries/base/GHC/Event/KQueue.hsc           |  2 +-
+ libraries/base/System/CPUTime/Posix/Times.hsc |  2 +-
+ libraries/base/System/Environment.hs          |  3 ++-
+ libraries/base/include/EventConfig.h.in       |  6 +++++
+ libraries/time/configure.ac                   |  3 +++
+ .../Data/Time/Clock/Internal/CTimespec.hsc    |  4 +--
+ .../lib/Data/Time/Clock/Internal/CTimeval.hs  | 25 +++++++++++++------
+ libraries/time/time.cabal                     |  1 +
+ libraries/unix/System/Posix/Env.hsc           |  3 ++-
+ .../unix/System/Posix/Env/ByteString.hsc      |  3 ++-
+ libraries/unix/System/Posix/Files.hsc         |  6 ++---
+ .../unix/System/Posix/Files/ByteString.hsc    |  6 ++---
+ libraries/unix/System/Posix/Files/Common.hsc  | 10 +++++---
+ libraries/unix/System/Posix/Signals.hsc       | 16 ++++++++----
+ libraries/unix/System/Posix/User.hsc          |  4 +--
+ rts/posix/OSThreads.c                         |  7 ++++--
+ rules/build-prog.mk                           |  4 +++
+ rules/shell-wrapper.mk                        |  2 +-
  19 files changed, 76 insertions(+), 34 deletions(-)
 
 diff --git a/aclocal.m4 b/aclocal.m4
-index c02c1d1..d1823af 100644
+index ac20bbc..3c9c8a9 100644
 --- a/aclocal.m4
 +++ b/aclocal.m4
-@@ -1990,6 +1990,9 @@ AC_DEFUN([GHC_CONVERT_OS],[
+@@ -1999,6 +1999,9 @@ AC_DEFUN([GHC_CONVERT_OS],[
                  #      i686-gentoo-freebsd8.2
          $3="freebsd"
          ;;
@@ -458,5 +458,5 @@ index bdab6e2..233ff3a 100644
  
  endif
 -- 
-2.16.2
+2.18.0
 

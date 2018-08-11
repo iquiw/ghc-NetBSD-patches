@@ -49,7 +49,7 @@ How to use?
 4. Run boot::
 
     (< 8.4) $ perl boot
-    (> 8.4) $ python3.6 boot
+    (> 8.4) $ python3.7 boot
 
 6. Build ghc. (Requires working ghc)
 
@@ -87,4 +87,4 @@ ghc-8.2.2.NetBSD.patch
    ghc-8.2.1, ghc-8.2.2
 
 ghc-8.4.1.NetBSD.patch
-   ghc-8.4.1
+   ghc-8.4.1, ghc-8.4.2, ghc-8.4.3
