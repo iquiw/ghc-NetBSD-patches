@@ -88,3 +88,6 @@ ghc-8.2.2.NetBSD.patch
 
 ghc-8.4.1.NetBSD.patch
    ghc-8.4.1, ghc-8.4.2, ghc-8.4.3
+
+ghc-8.6.2.NetBSD.patch
+   ghc-8.6.2
